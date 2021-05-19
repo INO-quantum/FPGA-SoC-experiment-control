@@ -10,9 +10,43 @@ I had only one bigger issue with Python - I think 3.5 is required - which I had 
 
 After Vivado is installed you need to download and copy the board files from Digilent: https://reference.digilentinc.com/vivado/installing-vivado/start#installing_digilent_board_files.
 
-Now you can generate the project from the provided TCL script: Extract the ExpCtrl_project_script_Cora_Z7_10.zip (ExpCtrl_project_script_Cora_Z7_07S.zip) file in the folder where you would like to have the project be located. Open Vivado - Tools - Run Tcl Script... and select the ExpCtrl_project_script_Cora_Z7_10.tcl (or ExpCtrl_project_script_Cora_Z7_07S.tcl) script and click ok. Vivado will regenerate the project. After this is done you can "Open Block Design" in the Flow Navigator to get an overview of the project. The block "dio24_0" is the main module of the experiment control. Double-click you can change parameters of this module. Right-click and select "Edit in IP packager" you can modifiy the verilog source files. After you are happy with the modifications select the tab "Package IP - dio24", click on all icons which are not marked with a green check mark and select "merge changes .." and finally on the "Review and Package" tab click "Re-Package IP". Back in the main project you should get a notification on the top indicating that you should "Report IP Status" (or click Tools - Report - Report IP status) and on the bottom you will se the panel "IP status" with dio24_0 indicated with revision changed. Click on "Upgrade Selected" and you are asked to generate output products which you confirm by clicking the "generate" button. If your changes were fine it will finish without errors after a minute. Click on "Generate Bitstream" and wait for several minutes (depends on how many changes were done) until the bitstream is created. Vivado will ask you if you want to "Open Implemented Design" which you can choose to open or just Cancel (since it takes some seconds). Click File - Export - Export Hardware. In the dialog box select "Include Bitstream" and click ok. Now you have generated the bistream which is loaded to the FPGA during the booting. The file design_1_.warpper.hdf is located in your project directory/project_name.sdk folder and you will need to copy it into the Petalinux project folder since the hdf contains also information about the "device tree" used by Petalinux (see below). 
+1.1 Now you can generate the Vivado project from the provided TCL scripts:
+  *copy the content of the folder Vivado2017.4/release_202x.x-x (take the latest) into the folder where you want the project to be located
+  *open Vivado and on the bottom "Tcl console" type: (tested on ubuntu 18.04 LTS, should be similar on other OS)
+    *cd /home/path to your folder with tcl scripts
+    *source ./ExpCtrl_dio24_project_script.tcl
+    *wait until the dio24 project is created. check that a new folder dio24 was created in the script folder.
+    *do not close the project but type in the "Tcl console" on the bottom:
+    *source ./ExpCtrl_dio24_package_script.tcl
+    *this will open the IP packager to package the dio24 project into a custom IP in the sub-folder /ip_repo/dio24/. this is the custom module which we use for the project. The Verilog source is in the /hdl folder. wait until the packager has closed and you are back in the dio24 project. Check if there are errors and close the Project.
+    *check that in the "IP Catalog" (in the Project Manager on the left) there is now a new entry "User Repository" - "UserIP" - "dio24_v1_0". Otherwise, click in Project Manager on "Settings" - "IP" - "Repository". remove any red repository there (select and click the "-") and click "+" and select the new /ip_repo folder.
+    *now you can create the main project for the Cora-Z7-10 or Cora-Zy-07S board (or both) and type again in the "Tcl console" of Vivado for either board:
+      *source ./ExpCtrl_Cora_Z7_10_project_script.tcl
+      *source ./ExpCtrl_Cora_Z7_10_project_script.tcl
+    *this will take a little bit longer but should create the main project. The last output on the console should read "INFO: Project created:Cora-Z7-10" or "INFO: Project created:Cora-Z7-07S". There should be also a new folder "Cora-Z7-10" or "Cora-Z7-07S". There will be a few critical warnings (12) which can be ignored. Four of them are: PCW_UIPARAM_DDR_DQS_TO_CLK_DELAY_* has negative value... They are about DDR timings which you can ignored. See here (for a different board): https://github.com/Digilent/SDSoC-Zybo-Z7-20
+    *in Project Manager - IP Integrator "Open Block Design" and you should see something similar as in the screenshot. Press the Round-Circle-Arrow symbol to regenerate the Layout.
+    *Click the Square-Check-Mark symbol to validate design: you should get only the 4 Critical Warnings from above.
+    *Click in Project Manager "Program and Debug" - "Generate Bitstream"
+    *this will generate the bitstream which will be uploaded on the FPGA. Depending on your computer this can take several minutes (the first time). On mine it takes 10 Minutes. You can observe the progress in the "Design Run" Tab on the Bottom.
+    *When Vivado is finished it will ask you to "Open Implemented Design" which you can "cancel" or click "ok" to see the placement on the chip and other information.
+    *click File - Export - Export Hardware - ensure "Include Bitstream" is selected and click ok. This saves the file design_1_warpper.hdf in your project directory/project_name.sdk folder. You will need to copy this file into the Petalinux project folder since the hdf contains not only the "bit stream" but also information about the "device tree" used by Petalinux (see below).
+  
+1.2 In case you want to modify the project: 
+  *in the Block design right-click on the dio24 module block and select "Edit in IP-packager". 
+  *In the packager you can modify the source Verilog files. 
+  *After Modification ensure that in the "Package IP" tab all items have a green checkmark, otherwise click the item and on the top "Merge changes...". 
+  *On the last entry on the bottom click "Re-package IP". 
+  *After this you have to "Upgrade IP". Usually you will get a notification that this has to be done, otherwise select "Tools" - "Reports" - "Report IP Status". and a new pane opens on the bottom. if there is a blue "Rerun" text click on it to run it again and it will tell you which module needs to be upgraded. Click on the bottom on "Upgrade Selected". 
+  *It will ask to "Regenerate Output Products" which you can click "OK" or click "Cancel" and immediately select "Generate Bitstream" again. 
+  *Generate Bitstream" again
+  *Watch out the "Messages" window on the bottom. There are many warnings (1331 for first run of tcl) but most can be ignored. However, if something does not work, you will most likely find hints there. Critical Warnings should not be ignored except a few standard ones (like the 4 PCW_UIPARAM_DDR_DQS_TO_CLK_DELAY_ from above or when the upgrading has detected port changes). Note that Vivado 2017.4 still displays old messages (especially errors) even when you have fixed them (not the case anymore in 2018 versions). 
 
-In Vivado 2018.1 and 2018.3 the upgrading was often not working or crashed Vivado and few times messed up the entire project such that it was not usable anymore. First try to "rerun" in the "IP Status" panel if it will work. Otherwise, close the project, reopen the project and then upgrading was usually working. Also the SDK (not used here) in the 2018 versions was always (100%) crashing and could not be used anymore after the project was changed. In 2017.4 I think I never had these problems.
+1.3 In case you have troubles, especially when Vivado crashes during the execution of the scripts you can check following:
+  *all crashes which I experienced on Ubuntu 18.04 happen randomly, often immediately or a few seconds after tcl script, IP packager or generating output products started. just retrying can help.
+  *ensure that Ubuntu is not running with Wayland but with Xorg and ensure that its up-to-date. avoid clicking anything during execution of the tcl script. maybe move the mouse outside of the Vivado window. there is a known bug from 2016-2018 (maybe even 2020?) versions of Vivado, but nothing has helped for me.
+  *wait until all background activity of Vivado has stopped or close and re-open before going to the next step.
+  *especially for upgrading an IP on Vivado 2018 it required to close the project and re-open it before upgrading. Maybe "Rerun" the IP status report might also help.
+  *Vivado 2017.4 seems more stable than 2018.1 and 2018.3 versions (the SDK was quasi unusable there but is not used here in this project).
 
 2. Software implementation:
 
