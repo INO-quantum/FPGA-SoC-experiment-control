@@ -61,6 +61,7 @@ set_clock_groups -asynchronous -group clk_fpga_0 -group [get_clocks -of_objects 
 ##todo: do inside cross_IO module and use set_max_delay (set_bus_scew and set_false_delay) instead for CDC!
 # auto-generated on 28/2/2021
 set_clock_groups -asynchronous -group [get_clocks clk_out_PS_design_1_clk_wiz_1_0_1] -group [get_clocks clk_fpga_0]
+set_clock_groups -asynchronous -group [get_clocks clk_out_PS_design_1_clk_wiz_1_0] -group [get_clocks clk_fpga_0]
 set_clock_groups -asynchronous -group [get_clocks clk_out_design_1_clk_wiz_1_0_1] -group [get_clocks clk_out_PS_design_1_clk_wiz_1_0]
 set_clock_groups -asynchronous -group [get_clocks clk_fpga_0] -group [get_clocks clk_out_PS_design_1_clk_wiz_1_0_1]
 set_clock_groups -asynchronous -group [get_clocks clk_out_design_1_clk_wiz_1_0] -group [get_clocks clk_out_PS_design_1_clk_wiz_1_0_1]
