@@ -169,3 +169,5 @@ This will add a hello-world demo application in the folder /project-spec/meta-us
         petalinux-config -c rootfs                      // check if is in list of apps and enable if not --enable
 
 This will add a demo install script in the folder /project-spec/meta-user/recipes-apps.
+
+

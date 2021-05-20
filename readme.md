@@ -51,3 +51,5 @@ The project has several folders. Look at the readme.md files there for specific 
 4. auto-synchronization: schematics of the auto-synchronization electronics
 5. labscript: labscript device implementation
 
+
+
