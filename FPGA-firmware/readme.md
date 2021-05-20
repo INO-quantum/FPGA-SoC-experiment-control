@@ -114,7 +114,7 @@ This is useful if you have several projects, otherwise Petalinux will download i
        petalinux-config
        select "Linux Component Selection"
        in "linux-kernel" select "ext-local-src"
-       in "External linux-kernel local source settings" select folder (I have /home/.../linux-xlnx-xilinx-v2017.4)
+       in "External linux-kernel local source settings" enter folder as "/home/<user name>/<path-to-folder>"
        download Kernel source into the selected folder 
 
 As kernel source I use this from Xilinx: https://github.com/Xilinx/linux-xlnx/releases/tag/xilinx-v2017.4
