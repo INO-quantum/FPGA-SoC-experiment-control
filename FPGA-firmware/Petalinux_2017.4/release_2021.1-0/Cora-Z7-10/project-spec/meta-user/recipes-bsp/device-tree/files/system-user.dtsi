@@ -1,0 +1,106 @@
+/include/ "system-conf.dtsi"
+#include <dt-bindings/gpio/gpio.h>
+
+/ {
+	model = "Zynq Cora Z7 Development Board";
+	compatible = "digilent,zynq-coraz7", "xlnx,zynq-7000";
+
+	chosen {
+		bootargs = "console=ttyPS0,115200 earlyprintk uio_pdrv_genirq.of_id=generic-uio";
+	};
+
+	usb_phy0: phy0@e0002000 {
+		compatible = "ulpi-phy";
+		#phy-cells = <0>;
+		reg = <0xe0002000 0x1000>;
+		view-port = <0x0170>;
+		drv-vbus;
+	};
+
+	/* added by Andi, 128MB CMA shared memory @128MB, see https://xilinx-wiki.atlassian.net/wiki/spaces/A/pages/18841683/Linux+Reserved+Memory */
+	reserved-memory {
+		#address-cells = <1>;
+		#size-cells = <1>;
+		ranges;
+
+		reserved: buffer@0x08000000 {
+			compatible = "shared-dma-pool";
+			reusable;
+			reg = <0x08000000 0x08000000>;
+			linux,cma-default;
+		};
+	};
+
+};
+
+&gem0 {
+	phy-handle = <&ethernet_phy>;
+/*	phy-reset-gpio = <&gpio0 GPIO_ACTIVE_LOW>;
+	phy-reset-active-low;	
+	phy-reset-duration = <10>;  */
+	ethernet_phy: ethernet-phy@1 { /* rtl8211e-vl */
+		reg = <1>;
+		device_type = "ethernet-phy";
+	};
+};
+&usb0 {	
+	dr_mode = "host";
+	usb-phy = <&usb_phy0>;
+};
+&sdhci0 {
+	u-boot,dm-pre-reloc;
+};
+&uart0 {
+	u-boot,dm-pre-reloc;
+};
+
+
+&xadc_wiz_0 {
+	clocks = <&clkc 15>;
+	xlnx,channels {
+		#address-cells = <1>;
+		#size-cells = <0>;
+		channelV@0 { /* V_P/V_N */
+			reg = <0>;
+		};
+		channelA8A9@1 { /* vaux0 */
+			reg = <1>;
+		};
+		channelA0@2 {
+			reg = <2>;
+		};
+		channelA4@6 {
+			reg = <6>;
+		};
+		channelA2@7 {
+			reg = <7>;
+		};
+		channelA10A11@9 {
+			reg = <9>;
+		};
+		channelA1@10 {
+			reg = <10>;
+		};
+		channelA6A7@13 {
+			reg = <13>;
+		};
+		channelA5@14 {
+			reg = <14>;
+		};
+		channelA3@16 {
+			reg = <16>;
+		};
+	};
+};
+
+/*
+&pwm_rgb {
+	compatible = "generic-uio";	
+};
+
+&axi_gpio_btn {
+	compatible = "generic-uio";
+};
+&axi_gpio_shield {
+	compatible = "generic-uio";
+};*/
