@@ -6,11 +6,11 @@ It is divided into the hardware logic implementation (Vivado) and the software p
 
 ## Hardware implementation:
 
-  The Hardware is generated with the Vivado 2017.4 software from Xilinx running on Ubuntu 18.04 LTS (Vivado is available also for Windows). Vivado WebPACK can be downloaded for free and supports the 7-Series SoC devices from Xilinx which are used in this project. For instructions on how to install Vivado 2017.4 see here: https://www.xilinx.com/support/documentation/sw_manuals/xilinx2017_4/ug973-vivado-release-notes-install-license.pdf. See also this tutorial: https://reference.digilentinc.com/vivado/installing-vivado/start. I have tested the Windows and Linux versions. Officially, Ubuntu 16.04.2 LTS is required but installation on 18.04 LTS was working. There are a few dependencies and the installer will tell you what is missing. 
+  The Hardware is generated with the Vivado 2017.4 software from Xilinx running on Ubuntu 18.04 LTS (Vivado is available also for Windows). Vivado WebPACK can be downloaded for free and supports the 7-Series SoC devices from Xilinx which are used in this project. For instructions on how to install Vivado 2017.4 see here: https://www.xilinx.com/support/documentation/sw_manuals/xilinx2017_4/ug973-vivado-release-notes-install-license.pdf. See also this tutorial: https://reference.digilentinc.com/vivado/installing-vivado/start. I have tested the Windows and Linux versions. Officially, Ubuntu 16.04.2 LTS is required but installation on 18.04 LTS was working (except of rare crashes). There are a few dependencies and the installer will tell you what is missing. 
 
-  I had only one bigger issue with Python - I think 3.5 is required - which I had installed but the installer did not recognize it. When I did this the first time, installing Python 2.7 was resolving the issue, the second time this did not help but somehow I have got it working without knowing how (I installed and disinstalled different versions of Python several times and in different ways). I tried to install Vivado on Ubuntu 20.04 LTS but I did not managed to solve the Python issue (should be solvable with better knowledge of Python and how its installed). I worked initially with Vivado 2018.1 and then 2018.3 but I had many problems and finally downgraded to 2017.4 which seems to be more stable. Also, the board support package for the Cora-Z7 board from Digilent require Petalinux 2017.4, which is designed to work with Vivado 2017.4.
+I had only one bigger issue with Python - I think 3.5 is required - which I had installed but the installer did not recognize it. When I did this the first time, installing Python 2.7 was resolving the issue, the second time this did not help but somehow I have got it working without knowing how (I installed and disinstalled different versions of Python several times and in different ways). I tried to install Vivado on Ubuntu 20.04 LTS but I did not managed to solve the Python issue (should be solvable with better knowledge of Python and how its installation works). I worked initially with Vivado 2018.1 and then 2018.3 but I had many problems and finally downgraded to 2017.4 which seems to be more stable. Also, the board support package for the Cora-Z7 board from Digilent require Petalinux 2017.4, which is designed to work with Vivado 2017.4.
 
-  After Vivado is installed you need to download and copy the board files from Digilent: https://reference.digilentinc.com/vivado/installing-vivado/start#installing_digilent_board_files.
+After Vivado is installed you need to download and copy the board files from Digilent: https://reference.digilentinc.com/vivado/installing-vivado/start#installing_digilent_board_files.
 
 ### Generate the Vivado project:
 
@@ -53,7 +53,7 @@ It is divided into the hardware logic implementation (Vivado) and the software p
 - Watch out the "Messages" window on the bottom. There are many warnings (1331 for first run of tcl) but most can be ignored. However, if something does not work, you will most likely find hints there. Critical Warnings should not be ignored except a few standard ones (like the 4 PCW_UIPARAM_DDR_DQS_TO_CLK_DELAY_ from above or when the upgrading has detected port changes). Note that Vivado 2017.4 still displays old messages (especially errors) even when you have fixed them (not the case anymore in 2018 versions). 
 
 ### In case of troubles:
-I have experienced many crashes of Vivado on Ubuntu 18.04 LTS during the execution of the tcl scripts and rarely otherwise
+Unfortunately, Vivado on Ubuntu 18.04 LTS tends to crash frequently during the execution of the tcl scripts and rarely otherwise
 - before packaging of the IP (the second script mentioned above), ensure, that in "Settings" - "IP" - "Repository" there is no red entry, otherwise remove it. If a project entry is there, remove it as well. 
 - all crashes happen randomly, often immediately or a few seconds after tcl script, IP packager or generating output products started. just retry and most likely it will work the next time.
 - ensure that Ubuntu is not using Wayland but Xorg as display server in Ubuntu. Ensure your Os is up-to-date. avoid clicking anything during execution of the tcl script. maybe move the mouse outside of the Vivado window. For Vivado there is a known bug from 2016-2018 versions (maybe even 2020?), but nothing has helped for me. However, it crashes only rarely and 2017 is maybe more stable than 2018 (there the SDK was unusable, but is not needed here).
@@ -113,7 +113,7 @@ This is useful if you have several projects, otherwise Petalinux will download i
     
        petalinux-config
        select "Linux Component Selection"
-       in "linux Kernel" select "ext-local-src"
+       in "linux-kernel" select "ext-local-src"
        in "External linux-kernel local source settings" select folder (I have /home/.../linux-xlnx-xilinx-v2017.4)
        download Kernel source into the selected folder 
 
@@ -129,7 +129,7 @@ copy the design_1_wrapper.hdf file generated by Vivado from the "sdk" folder (se
 
        petalinux-build
     
-For the first time this will download the linux kernel (if not selected from local folder) and u-boot (bootloader source). Compiling takes the first time longer (6 Minutes for me). 
+For the first time this will download the linux kernel (if not selected from local folder) and u-boot (bootloader source) and compiling will need some time (8 Minutes on my system including downloading). 
 
 6. Package files for booting from SD card:
 
@@ -138,36 +138,28 @@ For the first time this will download the linux kernel (if not selected from loc
 Copy image.ub and BOOT.BIN from the /images/linux folder (not the pre-built folder) to the micro-SD card, ensure the server.config file with the proper IP address is as well on the SD card and if you have set the MAC address in petalinux-config you can remove the uEnv.txt file from the SD card.
 
 
-### additional information for using Petalinux:
+### Using Petalinux:
 
-These are the steps if you are starting from the bsp provided by Digilent, or if you want to add new functionality.
+These are the first steps if you want to add new functionality.
 
 1. Add a new driver module (here dio24):
 
-       petalinux-create -t modules -n dio24 --enable		  // use lowercase only!
-       petalinux-config -c rootfs		                      // check if module is in list and enable module if not --enable
-       petalinux-config -c kernel	      	                // exit without modifications. this might be needed for 1st module?
+       petalinux-create -t modules -n dio24 --enable    // use lowercase only!
+       petalinux-config -c rootfs                       // check if module is in list and enable module if not --enable
+       petalinux-config -c kernel                       // exit without modifications. this might be needed for 1st module but not clear?
 
-This will add a demonstration driver module to the project in the folder <project>/project-spec/meta-user/recipes-modules.
+This will add a demonstration driver module to the project in the folder /project-spec/meta-user/recipes-modules.
 
 2. Add a new C++ application (here FPGA-server):
 
        petalinux-create -t apps --template c++ -n FPGA-server --enable  // do not use '_' in names!
-       petalinux-config -c rootfs		                                    // check if app is in list and enable if not --enable
+       petalinux-config -c rootfs                       // check if app is in list and enable if not --enable
  
-This will add a hello-world demo application in the folder <project>/project-spec/meta-user/recipes-apps. 
+This will add a hello-world demo application in the folder /project-spec/meta-user/recipes-apps. 
        
 3. Add a startup script:
         
         petalinux-create -t apps --template install -n FPGA-init --enable
-        petalinux-config -c rootfs		                                  // check if is in list of apps and enable if not --enable
+        petalinux-config -c rootfs                      // check if is in list of apps and enable if not --enable
 
-This will add a demo install script in the folder <project>/project-spec/meta-user/recipes-apps.
-
-4. Disable the DMA driver from Xilinx: otherwise you cannot use the dio24 driver
-
-       petalinux-config -c kernel
-       in device drivers: disable DMA Engine Support       // this ensures that my driver is used and not the one from Xilinx
-       in device drivers: disable multimedia support       // otherwise get errors about missing DMA driver
-       in device drivers: disable sound card support
-       in device drivers: graphics support: disable Xilinx DRM     // otherwise get errors about missing DMA driver
+This will add a demo install script in the folder /project-spec/meta-user/recipes-apps.
