@@ -171,5 +171,3 @@ This will add a hello-world demo application in the folder /project-spec/meta-us
 This will add a demo install script in the folder /project-spec/meta-user/recipes-apps.
 
 
-
-

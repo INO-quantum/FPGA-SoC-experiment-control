@@ -12,4 +12,3 @@ In the paper we propose an improofed setup which allows to synchronize several b
 - the 50 Ohm terminations is at both ends of the cable, independent of the driver and detector. 
 - the detector is connected with high impedance to the cable, so the same pulse can propagate to all secondary boards.
 - a FET or BJT is used to induce a short-cirquit at the secondary board. this reflects an inverted pulse which needs a different detector on the primary board, than on the secondary board, but should make it easier to measure short cables where the generated and reflected pulse would otherwise overlap.
-
