@@ -1,0 +1,28 @@
+LIBRARY dio64_32
+EXPORTS
+	DIO64_Close				@1
+	DIO64_GetAttr			@2
+	DIO64_In_Read			@3
+
+	DIO64_In_Start			@5
+	DIO64_In_Status			@6
+	DIO64_In_Stop			@7
+	DIO64_Load				@8
+	DIO64_Open				@9
+	DIO64_Out_Config		@10
+	DIO64_Out_ForceOutput	@11
+	DIO64_Out_GetInput		@12
+	DIO64_Out_Start			@13
+	DIO64_Out_Status		@14
+	DIO64_Out_Stop			@15
+	DIO64_Out_Write			@16
+	DIO64_SetAttr			@17
+
+	DIO64_OpenResource		@20
+	register_callback		@21
+	exit_all				@22
+	load_text_file			@30
+	save_text_file			@31
+	test					@40
+
+

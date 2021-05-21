@@ -1,0 +1,66 @@
+// modeless dialog box resource for FPGA status
+// created 7/7/2020 by Andi
+// last modified 7/7/2020 by Andi
+#include <windows.h>
+#include <winres.h>
+#include "resource.h"
+
+// icons
+IDI_DLG		ICON	"FPGA.ico"			// dialog icon
+IDI_NC		ICON	"nc.ico"			// not connected
+IDI_OK		ICON	"ok.ico"			// running
+IDI_ERR		ICON	"error.ico"			// error
+// dialog box
+IDD_DIALOG DIALOGEX 0, 0, 350, 350
+STYLE WS_POPUP | WS_CAPTION | WS_BORDER| WS_SYSMENU | WS_VISIBLE
+CAPTION	"FPGA status"
+FONT 8, "MS Sans Serif"
+BEGIN
+  // general
+  DEFPUSHBUTTON		"Close"			,ID_EXIT		, 290, 25,  50,  15
+  // board 0
+  GROUPBOX			"board 0"		,IDC_STATIC		,  10,  10, 130, 335
+  ICON				IDI_NC			,ID_ICON_0		,  15,  20,  32,  32	,SS_ICON
+  EDITTEXT							,ID_IP_0		,  50,  25,  85,  13	,WS_DISABLED
+  AUTOCHECKBOX		"active"		,ID_USE_0		,  95,  45,  40,  10	,WS_DISABLED|BS_AUTOCHECKBOX|BS_LEFTTEXT
+  LTEXT				"conf 0x"		,IDC_STATIC		,  15,  62,  30,  10
+  EDITTEXT							,ID_CONF_0		,  50,  60,  85,  13	,WS_DISABLED
+  LTEXT				"status 0x"		,IDC_STATIC		,  15,  80,  30,  10
+  LTEXT				"0"				,ID_STATUS_0	,  50,  80,  80,  10
+  LTEXT				"time (us)"		,IDC_STATIC		,  15,  90,  30,  10
+  LTEXT				"0"				,ID_TIME_0		,  50,  90,  80,  10
+  LTEXT				STATUS_TEXT		,ID_STATUS_FULL_0, 15, 105, 120,  80
+  LTEXT				"last commands:",IDC_STATIC		,  15, 180, 100,  20
+  AUTOCHECKBOX		"auto-scroll"	,ID_ASCROLL_0	,  85, 180,  50,  10	,BS_LEFTTEXT|BS_AUTOCHECKBOX
+  LISTBOX							,ID_LIST_0		,  15, 190, 120, 150	,WS_VSCROLL|WS_HSCROLL
+  // board 1
+  GROUPBOX			"board 1"		,IDC_STATIC		, 150,  10, 130, 335
+  ICON				IDI_NC			,ID_ICON_1		, 155,  20,  32,  32	,SS_ICON
+  EDITTEXT							,ID_IP_1		, 190,  25,  85,  13	,WS_DISABLED
+  AUTOCHECKBOX		"active"		,ID_USE_1		, 235,  45,  40,  10	,WS_DISABLED|BS_AUTOCHECKBOX|BS_LEFTTEXT
+  LTEXT				"conf 0x"		,IDC_STATIC		, 155,  62,  30,  10
+  EDITTEXT							,ID_CONF_1		, 190,  60,  85,  13	,WS_DISABLED
+  LTEXT				"status 0x"		,IDC_STATIC		, 155,  80,  30,  10
+  LTEXT				"0"				,ID_STATUS_1	, 190,  80,  80,  10
+  LTEXT				"time (us)"		,IDC_STATIC		, 155,  90,  30,  10
+  LTEXT				"0"				,ID_TIME_1		, 190,  90,  50,  10
+  LTEXT				STATUS_TEXT		,ID_STATUS_FULL_1,155, 105, 120,  80
+  LTEXT				"last commands:",IDC_STATIC	    , 155, 180, 100,  10
+  AUTOCHECKBOX		"auto-scroll"	,ID_ASCROLL_1	, 225, 180,	 50,  10	,BS_LEFTTEXT
+  LISTBOX							,ID_LIST_1		, 155, 190, 120, 150	,WS_VSCROLL | WS_HSCROLL
+  // manual mode
+  GROUPBOX			"manual"		,IDC_STATIC		, 285,  60,  60, 285
+  AUTOCHECKBOX		"manual"		,ID_MANUAL		, 290,  75,  50,  15	,BS_PUSHLIKE
+  PUSHBUTTON		"status"		,ID_STATUS		, 290,  95,  50,  15	,WS_DISABLED
+  PUSHBUTTON		"reset"			,ID_RESET		, 290, 115,  50,  15	,WS_DISABLED
+  PUSHBUTTON		"load file"		,ID_LOAD		, 290, 145,  50,  15	,WS_DISABLED
+  PUSHBUTTON		"save file"		,ID_SAVE		, 290, 165,  50,  15	,WS_DISABLED
+  AUTOCHECKBOX		"keep data"		,ID_KEEP		, 290, 185,  50,  15	,WS_DISABLED
+  LTEXT				"0 samples"		,IDC_STATIC	    , 290, 205,  50,  10
+  PUSHBUTTON		"open"			,ID_OPEN_CLOSE	, 290, 225,  50,  15	,WS_DISABLED
+  PUSHBUTTON		"config"		,ID_CONFIG		, 290, 245,  50,  15	,WS_DISABLED
+  PUSHBUTTON		"send data"		,ID_SEND		, 290, 265,  50,  15	,WS_DISABLED
+  PUSHBUTTON		"start"			,ID_START_STOP	, 290, 285,  50,  15	,WS_DISABLED
+  LTEXT				"reps"			,IDC_STATIC	    , 290, 307,  20,  10
+  EDITTEXT							,ID_REPS		, 305, 305,  35,  13	,WS_DISABLED
+END
