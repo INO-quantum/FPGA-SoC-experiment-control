@@ -91,7 +91,7 @@ In the sub-folder "pre-built" of the project you find the prebuilt images with w
 
 In case of problems:
 - check the board is powered (red LED is on) and power is stable - especially during booting. If using a wall-plug be absolutely sure it gives 5V DC with more than 0.3A (1A recommended)! 
-- if the yellow LED is not on, then the bitstream was not written. either the SD card is not properly inserted or the bitstream is corrupt or for a different board. check that the SD card is properly inserted: remove and insert again. check that the sticker on the FPGA-SoC chip reads "10" for the Cora-Z7-10 board or "07S" for the Cora-Z7-07S board. Choose the proper images for the board. try to copy the images again or try a different micro SD card.
+- if the yellow LED is not on, then the bitstream was not written. either the SD card is not properly inserted or the bitstream is corrupt or for a different board. check that the SD card is properly inserted: remove and insert again. check that the sticker on the FPGA-SoC chip reads "10" for the Cora-Z7-10 board or "7S" for the Cora-Z7-07S board. Choose the proper images for the board. try to copy the images again or try a different micro SD card.
 - sometimes the board boots accidently into the "Zynq>" console or you have entered something on the terminal during boot. Enter: "boot" or push the SRST button and the board should boot again.
 
 ### Compiling the Petalinux project:
