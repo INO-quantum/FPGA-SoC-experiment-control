@@ -62,7 +62,7 @@ Unfortunately, Vivado on Ubuntu 18.04 LTS tends to crash frequently during the e
 
 ## Software implementation:
 
-Petalinux is a simple Linux distribution which allows you to run an embedded Linux operating system on the CPU. The original board support package (bsp) I used for this project is from Digilent and requires Petalinux 2017.4, which needs to be installed on Ubuntu or a few other Linux OS. Please follow this guide to install Petalinux: https://github.com/Digilent/Petalinux-Cora-Z7-10. The guide uses the recommended installation folder /opt/pkg/petalinux.
+Petalinux is a simple Linux distribution which allows you to run an embedded Linux operating system on the CPU. The original board support package (bsp) I used for this project is from Digilent (see https://reference.digilentinc.com/reference/software/petalinux/start) and requires Petalinux 2017.4, which needs to be installed on Ubuntu or a few other Linux OS. Please follow this guide to install Petalinux: https://github.com/Digilent/Petalinux-Cora-Z7-10. The guide uses the recommended installation folder /opt/pkg/petalinux.
 
 
 ### Generate Project:
