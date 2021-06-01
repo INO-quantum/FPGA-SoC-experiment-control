@@ -20,6 +20,12 @@ The project has several folders. Look at the readme.md files there for specific 
 
 This project contains everything to generate your own FPGA-SoC experimental control system designed for cold or ultracold atoms experiments. But any other use is welcome!
 
+Here a figure (taken from the paper) with an overview of the system:
+
+<img src="paper/setup.png" width="600"/>
+
+(a) Each of the FPGA-SoC boards (red) is inserted inside of a 19" rack at possibly remote locations from each other and are connected via Ethernet (orange) to a control computer. The timing is provided by an external clock (green) and a trigger line (blue) which is driven by one of the boards (the primary board) and connects to all of the other (secondary) boards. (b) Image of the FPGA-SoC mounted on top of the buffer card used to connect the FPGA-SoC with the rack. (c) Image of the FPGA-SoC board.
+
 The heart of the exerpimental control system is the Cora-Z7 board from Digilent Inc. https://store.digilentinc.com/cora-z7-zynq-7000-single-core-and-dual-core-options-for-arm-fpga-soc-development/. There are two boards available: Cora-Z7-10 and Cora-Z7-07S where the former has a dual-core CPU and the later a single-core CPU and a slightly smaller FPGA. The only measured difference between the performance of the two boards is that the uploading rate of the single-core CPU board was about 80% smaller than that of the dual-core CPU. The FPGA and DMA performance is exactly the same. The single-core board is slightly cheaper and the difference in FPGA size is not much. If you do not plan big additions in the FPGA part (we use about 60-80%) and you never upload many many samples, then this board is perfectly fine.
 
 This is a low-cost FPGA-SoC development board. The SoC (system-on-a-chip) has a dual or single-core CPU (ARM Cortex A9) and on the same chip a FPGA (field-programmable gate array). The CPU allows to run a simple Linux operating system (Petalinux 2017.4) on the CPU which allows you to run your custom code or applications and facilitates using system services to access external hardware (Ethernet, DDR memory, USB keyboard/mouse, SD card, etc.). The FPGA allows to implement custom hardware (logic, PLLs, SERDES, etc.) which you can configure as you please. The tight connection between the CPU and FPGA allows to control the hardware by software and to efficiently transfer data between the two parts. 
