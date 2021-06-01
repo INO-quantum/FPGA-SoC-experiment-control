@@ -15,4 +15,6 @@ The actual configuration uses 12 bytes per sample with 4 bytes timestamp, 4 byte
 
 If you do not need to keep compatibility with the old driver and application you can compile the project directly with 64bits (x64) instead of 32bits.
 
-A simple testing program "Dlltest" is provided with the project, but it is in an undefined state and might give some error. Be warned, that you should not run this with the board connected to actual devices since it sends arbitrary data to the FPGa-SoC board!
+A simple testing program "Dlltest" is provided with the project, but it is in an undefined state and might give some error. Be warned, that you should not run this with the board connected to actual devices since it sends arbitrary data to the FPGa-SoC board! 
+
+I have to update the DLL very soon for another experiment and at this occasion I will clean up this better.
