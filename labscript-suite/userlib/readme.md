@@ -28,7 +28,7 @@ Steps to get started:
   e) blacs [optional in another terminal after steps a-b]
 
 Editing connection table and experimental sequence files:
-You have to edit your experimental control sequence (as for example FPGA_test.py) and connection_table.py to adapt to your setup. These are simple Python files located in the folder labscript-suite/userlib/labscriptlib/<your apparatus name>. The top of your experimental sequence file must be using the same names and arguments as used in the connection_table.py. The experimental sequence file must contain a subset of connection_table.py. It is important that in connection_table.py you still call start() and stop(1.0) functions. There can be commands between the start() and stop(1.0) but it does not make a difference. The time given to stop must be nonzero but otherwise does not matter. 
+You have to edit your experimental control sequence (as for example FPGA_test.py) and hardware_setup.py to adapt to your setup. These are simple Python files located in the folders labscript-suite/userlib/labscriptlib/<your apparatus name> and labscript-suite/userlib/pythonlib/. The top of your experimental sequence file must import the hardware_setup.py file. The file connection_table.py is also importing the same file and does not need to be modified.
   
   The FPGA-SoC device is declared with:
   FPGA_board(name='board0', ip_address=PRIMARY_IP, ip_port=DEFAULT_PORT, bus_rate=1.0, num_racks=2)
