@@ -14,12 +14,12 @@ register_classes(
 
 register_classes(
     'AnalogChannels',
-    BLACS_tab=None,
+    BLACS_tab=blacs_tab,
     runviewer_parser=runviewer_parser,
 )
 
 register_classes(
     'DigitalChannels',
-    BLACS_tab=None,
+    BLACS_tab=blacs_tab,
     runviewer_parser=runviewer_parser,
 )

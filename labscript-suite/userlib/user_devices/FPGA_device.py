@@ -14,6 +14,10 @@ import numpy as np
 from time import sleep
 import struct
 import h5py, labscript_utils.h5_lock
+#import libusb
+#libusb.config(LIBUSB=None)
+
+from qtutils.qt.QtWidgets import *
 
 #default connection
 PRIMARY_IP   = '192.168.1.11'
@@ -187,6 +191,14 @@ def parse_num(num):
         else: return int(num)
     else:
         return num # assume is already a number
+
+def time_to_str(time):
+    #convert time (float) in seconds into well readable string
+    if time < 1e-12: return '0s'
+    elif time < 1e-6: return ('%.3fns' % (time*1e9))
+    elif time < 1e-3: return ('%.3fus' % (time*1e6))
+    elif time < 1.0: return ('%.6fms' % (time*1e3))
+    else: return ('%.6fs' % time)
 
 #basic checking when adding new devices to one of the IntermediateDevice below
 #returns decimal numbers [rack,address,channel] of device or raises LabscriptError on error
@@ -437,7 +449,7 @@ class FPGA_board(PseudoclockDevice):
                 print('     time:       data')
                 for d in data: print('%9u: 0x%08x' % (d[0], d[1]))
         print('%i/%i samples, smallest time step %d x %.3f us' % (len(data), len(times), min_step, 1e6/self.bus_rate))
-        print('first time %es, second time %es, last time %fs' % (data[0,0],data[1,0],data[-1,0]))
+        print('first time %s, second time %s, last time %s' % (time_to_str(data[0,0]),time_to_str(data[1,0]),time_to_str(data[-1,0])))
 
         # #save matrix to file
         group = hdf5_file['devices'].create_group(self.name)
@@ -460,29 +472,29 @@ def get_channels(device, is_analog):
     child_list = {}
     if is_analog:
         #num_AO = device.properties['num_AO'] # AnalogChannels
-        print("'%s' with %i analog outputs:" % (device.name, len(device.child_list)))
+        #print("'%s' with %i analog outputs:" % (device.name, len(device.child_list)))
         for child_name, child in device.child_list.items():
             rack, address, channel = child.properties['address'].split('/')
             rack = int(rack)
             address = int(address)
             channel = int(channel)
-            print("  '%s' %i/0x%0x/%i" % (child.name, rack, address, channel))
+            #print("  '%s' %i/0x%0x/%i" % (child.name, rack, address, channel))
             #TODO: in runmanager save these properties for each channel
             props = {'base_unit':'V', 'min':-10.0, 'max':10.0,'step':0.1, 'decimals':3}
             ID = (TYPE_AO<<24)|(rack<<16)|(address<<8)|channel
-            child_list[child_name] = [ID,props,child.name,child.parent_port,0.0]
+            child_list[child_name] = [ID,props,child]
     else:
         #num_DO = device.properties['num_DO'] # DigitalChannels
-        print("'%s' with %i digital outputs:" % (device.name, len(device.child_list)))
+        #print("'%s' with %i digital outputs:" % (device.name, len(device.child_list)))
         for child_name, child in device.child_list.items():
             rack, address, channel = child.properties['address'].split('/')
             rack = int(rack)
             address = int(address)
             channel = int(channel)
-            print("  '%s' %i/0x%0x/%i" % (child.name, rack, address, channel))
+            #print("  '%s' %i/0x%0x/%i" % (child.name, rack, address, channel))
             props = {}
             ID = (TYPE_DO<<24)|(rack<<16)|(address<<8)|channel
-            child_list[child_name] = [ID,props,child.name,child.parent_port,0]
+            child_list[child_name] = [ID,props,child]
     return child_list
 
 @runviewer_parser
@@ -589,7 +601,19 @@ class RunviewerClass(object):
                 pass
         #TODO: not sure which name to use and what data it wants here?
         return {}
-        
+
+
+# vendor and product id and serial number
+USB_VID     = 0xA5A5        # Prevedelli
+#USB_PID    = 0x9958        # AD9958
+#USB_PID    = 0x9854	    # Poli: AD9854
+USB_PID     = 0x0001		# Poli: AD9854 older?
+USB_SERIAL	= 3             # serial number
+
+# init USB devices (still testing)
+def FindUSBDevice():
+    pass
+
 from blacs.tab_base_classes import Worker, define_state
 from blacs.tab_base_classes import MODE_MANUAL, MODE_TRANSITION_TO_BUFFERED, MODE_TRANSITION_TO_MANUAL, MODE_BUFFERED  
 from blacs.device_base_class import DeviceTab
@@ -735,8 +759,6 @@ class FPGA_Tab(DeviceTab):
         # print(clockline.name)
 
         #get all channels from intermediate devices
-        #TODO: there is a '-' below name. it seems the name should be 'channel #' and the '-' should be device.name?
-        #      see blacs/device_base_class.py "What do the properties dictionaries need to look like?" but I cannot get this working.
         ao_list = {}
         do_list = {}
         for IM_name, IM in self.clockline.child_list.items():
@@ -747,26 +769,44 @@ class FPGA_Tab(DeviceTab):
             else: # DDS not implemented yet
                 print("'%s' unknown device (ignore)" % IM_name)
 
-        # get ananlog output properties
+        # get ananlog and digital output properties.
+        # key = displayed channel name = type rack.address.channel
+        # all_childs is used by get_child_from_connection_table to find child connection object for channel name
+        # all_IDs is used to get ID from channel name for sorting function
         ao_prop = {}
+        self.all_childs = {}
+        all_IDs = {}
         for name, ll in ao_list.items():
-            [ID, props, parent, conn, last] = ll
-            ao_prop[name] = props
+            [ID, props, child] = ll
+            key = "AO%x.%x.%x"%((ID>>16)&0xff,(ID>>8)&0xff,ID&0xff)
+            ao_prop[key] = props
+            self.all_childs[key] = child
+            all_IDs[key] = ID
         #get digital output properties (emptry)
         do_prop = {}
         for name, ll in do_list.items():
-            [ID, props, parent, conn, last] = ll
-            do_prop[name] = props
+            [ID, props, child] = ll
+            key = "DO%x.%x.%x" % ((ID >> 16) & 0xff, (ID >> 8) & 0xff, ID & 0xff)
+            do_prop[key] = props
+            self.all_childs[key] = child
+            all_IDs[key] = ID
 
         # Create the output objects
         print('Andi create %i analog  outputs' % (len(ao_list)))
+        print(ao_prop)
         self.create_analog_outputs(ao_prop)
+
         print('Andi create %i digital outputs' % (len(do_list)))
+        print(do_prop)
         self.create_digital_outputs(do_prop)
+
+        #returns integer ID = unique identifier of channel (type|rack|address|channel)
+        def sort(channel):
+            return all_IDs[channel]
 
         # create widgets and place on GUI
         dds_widget, ao_widgets, do_widgets = self.auto_create_widgets()
-        self.auto_place_widgets(('Analog outputs', ao_widgets), ('Digital outputs', do_widgets))
+        self.auto_place_widgets(('Analog outputs', ao_widgets, sort), ('Digital outputs', do_widgets, sort))
 
         # Create and set the primary worker
         self.create_worker("main_worker", FPGA_Worker, {'con':self.con,'do_list':do_list,'ao_list':ao_list,'num_racks':self.num_racks,'bus_rate':self.bus_rate})
@@ -775,6 +815,57 @@ class FPGA_Tab(DeviceTab):
         # Set the capabilities of this device
         self.supports_remote_value_check(False)
         self.supports_smart_programming(False)
+
+        # add device buttons
+        layout = self.get_tab_layout()
+        group = QGroupBox("FPGA")
+        layout.addWidget(group)
+        grid =QGridLayout()
+        grid.setHorizontalSpacing(50)
+        group.setLayout(grid)
+
+        # device state button
+        bt_state = QPushButton('get state')
+        bt_state.setStyleSheet('QPushButton {border:1px solid #8f8f91; border-radius: 3px;}')
+        grid.addWidget(bt_state,0,0)
+        bt_state.clicked.connect(self.get_state)
+
+        # connect / disconnect button
+        bt_conn = QPushButton('disconnect')
+        bt_conn.setStyleSheet('QPushButton {border:1px solid #8f8f91; border-radius: 3px;}')
+        grid.addWidget(bt_conn,0,1)
+        bt_conn.clicked.connect(self.conn)
+        #TODO: get actual connection status and connect or disconnect with this button!
+
+        # abort button
+        bt_abort = QPushButton('abort!')
+        bt_abort.setStyleSheet('QPushButton {color: red; border:1px solid #ff0000; border-radius: 3px;}')
+        grid.addWidget(bt_abort,0,2)
+        bt_abort.clicked.connect(self.abort)
+
+    def get_child_from_connection_table(self, parent_device_name, port):
+        # this is called from create_analog_outputs or create_digital_outputs to get the name of the channel.
+        # if not defined, the default implementation assumes that self (FPGA board) is the parent device of all channels.
+        # but the parents of the channels are the intermediate devices.
+        # port = channel name displayed by blacs
+        # we return the connection object (device) of the corresponding channel. blacs is displaying device.name.
+        return self.all_childs[port]
+
+    @define_state(MODE_BUFFERED, True)
+    def abort(self, state):
+        result = yield(self.queue_work(self.primary_worker, 'abort'))
+        print('abort', result)
+
+    @define_state(MODE_MANUAL,True)
+    def get_state(self, state):
+        # insert command into worker queue
+        result = yield(self.queue_work(self.primary_worker, 'get_state'))
+        print('get_state', result)
+
+    @define_state(MODE_MANUAL, True)
+    def conn(self, state):
+        #result = yield(self.queue_work(self.primary_worker, 'disconnect'))
+        print('dicsonnect')
 
     @define_state(MODE_BUFFERED, True)
     def start_run(self, notify_queue):
@@ -805,14 +896,17 @@ class FPGA_Worker(Worker):
 
         print("'%s' init" % (self.device_name))
 
+        # test libusb
+        #FindUSBDevice()
+
         # change ananlog output list to contain only IDs and last values
         for name, ll in self.ao_list.items():
-            [ID, props, parent, conn, last] = ll
-            self.ao_list[name] = [ID, last]
+            [ID, props, child] = ll
+            self.ao_list[name] = [ID, 0]
         # change digital output list to contain only IDs and last values
         for name, ll in self.do_list.items():
-            [ID, props, parent, conn, last] = ll
-            self.do_list[name] = [ID, last]
+            [ID, props, child] = ll
+            self.do_list[name] = [ID, 0]
 
         # connect - open - reset - configure board
         # on error: we disconnect and set self.sock=None
@@ -859,7 +953,7 @@ class FPGA_Worker(Worker):
             # for each address & rack we have to collect all channel bits
             if len(do_IDs) > 0:
                 do_IDs = list(set(do_IDs)) # gives unique IDs
-                print(do_IDs)
+                #print(do_IDs)
                 for ID in do_IDs:
                     rack = (ID>>16) & 0xff
                     address = (ID>>8) & 0xff
@@ -905,6 +999,27 @@ class FPGA_Worker(Worker):
                         if result == SERVER_ACK:
                             return front_panel_values # ok
         return None # TODO: how to indicate error?
+
+    def get_state(self):
+        # get board state
+        # TODO: to be done
+        print('worker: get state')
+        return False
+
+    def abort(self):
+        # stop output immediately
+        if self.sock == None:
+            print("'%s' not connected at %s" % (self.device_name, self.con))
+        else:
+            # stop board
+            #result = send_recv_data(self.sock, to_client_data32(SERVER_STOP, STOP_NOW), SOCK_TIMEOUT, output='stop')
+            result = send_recv_data(self.sock, SERVER_STOP, SOCK_TIMEOUT, output='STOP')
+            if result == SERVER_ACK:
+                # reset board
+                result = send_recv_data(self.sock, SERVER_RESET, SOCK_TIMEOUT, output='RESET')
+                if result == SERVER_ACK:
+                    return True # success
+        return False # error
 
     def transition_to_buffered(self, device_name, h5file, initial_values, fresh):
         if self.sock == None: # try to reconnect to device
