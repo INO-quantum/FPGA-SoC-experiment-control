@@ -482,7 +482,8 @@ def get_channels(device, is_analog):
             #TODO: in runmanager save these properties for each channel
             props = {'base_unit':'V', 'min':-10.0, 'max':10.0,'step':0.1, 'decimals':3}
             ID = (TYPE_AO<<24)|(rack<<16)|(address<<8)|channel
-            child_list[child_name] = [ID,props,child]
+            ch_name = "AO%x.%x.%x"%((ID>>16)&0xff,(ID>>8)&0xff,ID&0xff)
+            child_list[child_name] = [ID,props,child,ch_name]
     else:
         #num_DO = device.properties['num_DO'] # DigitalChannels
         #print("'%s' with %i digital outputs:" % (device.name, len(device.child_list)))
@@ -494,7 +495,8 @@ def get_channels(device, is_analog):
             #print("  '%s' %i/0x%0x/%i" % (child.name, rack, address, channel))
             props = {}
             ID = (TYPE_DO<<24)|(rack<<16)|(address<<8)|channel
-            child_list[child_name] = [ID,props,child]
+            ch_name = "DO%x.%x.%x" % ((ID >> 16) & 0xff, (ID >> 8) & 0xff, ID & 0xff)
+            child_list[child_name] = [ID,props,child,ch_name]
     return child_list
 
 @runviewer_parser
@@ -777,16 +779,16 @@ class FPGA_Tab(DeviceTab):
         self.all_childs = {}
         all_IDs = {}
         for name, ll in ao_list.items():
-            [ID, props, child] = ll
-            key = "AO%x.%x.%x"%((ID>>16)&0xff,(ID>>8)&0xff,ID&0xff)
+            [ID, props, child, key] = ll
+            #key = "AO%x.%x.%x"%((ID>>16)&0xff,(ID>>8)&0xff,ID&0xff)
             ao_prop[key] = props
             self.all_childs[key] = child
             all_IDs[key] = ID
         #get digital output properties (emptry)
         do_prop = {}
         for name, ll in do_list.items():
-            [ID, props, child] = ll
-            key = "DO%x.%x.%x" % ((ID >> 16) & 0xff, (ID >> 8) & 0xff, ID & 0xff)
+            [ID, props, child, key] = ll
+            #key = "DO%x.%x.%x" % ((ID >> 16) & 0xff, (ID >> 8) & 0xff, ID & 0xff)
             do_prop[key] = props
             self.all_childs[key] = child
             all_IDs[key] = ID
@@ -808,8 +810,19 @@ class FPGA_Tab(DeviceTab):
         dds_widget, ao_widgets, do_widgets = self.auto_create_widgets()
         self.auto_place_widgets(('Analog outputs', ao_widgets, sort), ('Digital outputs', do_widgets, sort))
 
+        # change ananlog output list to contain only IDs and last values
+        ao_list2 = {}
+        for name, ll in ao_list.items():
+            [ID, props, child, key] = ll
+            ao_list2[key] = [ID, 0]
+        # change digital output list to contain only IDs and last values
+        do_list2 = {}
+        for name, ll in do_list.items():
+            [ID, props, child, key] = ll
+            do_list2[key] = [ID, 0]
+
         # Create and set the primary worker
-        self.create_worker("main_worker", FPGA_Worker, {'con':self.con,'do_list':do_list,'ao_list':ao_list,'num_racks':self.num_racks,'bus_rate':self.bus_rate})
+        self.create_worker("main_worker", FPGA_Worker, {'con':self.con,'do_list':do_list2,'ao_list':ao_list2,'num_racks':self.num_racks,'bus_rate':self.bus_rate})
         self.primary_worker = "main_worker"
 
         # Set the capabilities of this device
@@ -899,15 +912,6 @@ class FPGA_Worker(Worker):
         # test libusb
         #FindUSBDevice()
 
-        # change ananlog output list to contain only IDs and last values
-        for name, ll in self.ao_list.items():
-            [ID, props, child] = ll
-            self.ao_list[name] = [ID, 0]
-        # change digital output list to contain only IDs and last values
-        for name, ll in self.do_list.items():
-            [ID, props, child] = ll
-            self.do_list[name] = [ID, 0]
-
         # connect - open - reset - configure board
         # on error: we disconnect and set self.sock=None
         #           in program_manual and transition_to_buffered we retry
@@ -917,9 +921,9 @@ class FPGA_Worker(Worker):
     def program_manual(self, front_panel_values):
         if self.sock == None: # try to reconnect to device
             self.sock = init_connection(self.device_name, self.con)
-        #if self.sock is not None: ignore for testing
-        if True:
-            #print("'%s' program manual" % (self.device_name))
+        if self.sock is not None: # ignore for testing
+        #if True:
+            print("'%s' program manual" % (self.device_name))
             # TODO: is there a more efficient way? 
             #print(front_panel_values)
             # we first loop through all GUI devices and generate a list of changed digital channels
@@ -928,6 +932,7 @@ class FPGA_Worker(Worker):
             time = 0
             sample = [time] + [NOP_BIT_SH]*self.num_racks
             do_IDs = []
+            print(self.do_list)
             for key, value in front_panel_values.items():
                 try:
                     [ID, last] = self.do_list[key] # DigitalChannels
@@ -948,12 +953,12 @@ class FPGA_Worker(Worker):
                             sample = [time] + [NOP_BIT_SH]*self.num_racks
                             self.ao_list[key] = [ID, value]
                     except KeyError: # unknown device?
-                        pass
+                        print("unknown device '%s', value %f" % (key, value))
             # generate samples for changed digital channels
             # for each address & rack we have to collect all channel bits
             if len(do_IDs) > 0:
                 do_IDs = list(set(do_IDs)) # gives unique IDs
-                #print(do_IDs)
+                print(do_IDs)
                 for ID in do_IDs:
                     rack = (ID>>16) & 0xff
                     address = (ID>>8) & 0xff
