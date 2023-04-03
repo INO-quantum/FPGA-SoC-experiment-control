@@ -1,5 +1,5 @@
 # labscript_FPGA-SoC_device
-python code to implement FPGA-SoC board in labscript-suite (last change 3/4/2023)
+python code to implement FPGA-SoC board in labscript-suite
 
 The FPGA-SoC board:
 The board is used as a low-cost experimental control hardware for controlling cold and ultracold atoms experiments. It is designed to work together with existing hardware placed in a 19" rack and replaces the outdated DIO64 (probably also DIO128) boards from Viewpoint Systems. In each rack several plug-in modules can be inserted, like digital or analog outputs which are programmed via a ribbon cable "bus" on the backplane of the rack. A custom buffer card was designed to buffer and level-shift the signal from the FPGA-SoC board (3.3V) from the rack (5V) and which hosts clock input and output buffers for an external clock reference and additional buffers for external triggers and to synchronize several boards. The FPGA-SoC board is connected with the Arduino style headers to the buffer card which is directly inserted into the rack and connects to the backplane bus. The setup might be also compatible with similar racks used with other digital I/O cards like the ones from National Instruments. The board is a commercial low-cost board from Digilent Inc. called Cora-Z7-10. The cheaper Cora-Z7-07S board is suiteable as well, but has only a single-core CPU which could limit certain applications. The board has a FPGA-SoC chip from Xilinx (Zynq-7010 or 7007S), Gigabit Ethernet, USB (device and host) ports and plenty of external pins in an extended Arduino style layout. On the FPGA-SoC (system-on-a-chip) a simple Linux operating system (petalinux 2017) is running on the CPU which faciliates proptyping and tests where one can execute C/C++ applications or even Python code (if Python is installed). The second half of the chip is the FPGA (field-programmable gate array) part which contains custom hardware design (programmed in Verilog) which generates the signals which communicate with the devices on the bus. 
@@ -21,14 +21,19 @@ Steps to get started:
 3. into the folder labscript-suite/userlib/labscriptlib/<your apparatus name> copy conncetion_table.py and FPGA_test.py
 4. edit 'FPGA_test.py' and accordingly connection_table.py for your experimental setup (see comments in files and below)
 5. in linux from a terminal window (other OS see labscript doc)
-  a) cd <labscript installation folder>
-  b) source .venv/bin/activate
-  c) runmanager
-  d) runviewer [optional in another terminal after steps a-b]
-  e) blacs [optional in another terminal after steps a-b]
+  
+  5a) cd [labscript installation folder]
+  
+  5b) source .venv/bin/activate
+  
+  5c) runmanager
+  
+  5d) runviewer [optional in another terminal after steps 5a-b]
+  
+  5e) blacs [optional in another terminal after steps 5a-b]
 
 Editing connection table and experimental sequence files:
-You have to edit your experimental control sequence (as for example FPGA_test.py) and hardware_setup.py to adapt to your setup. These are simple Python files located in the folders labscript-suite/userlib/labscriptlib/<your apparatus name> and labscript-suite/userlib/pythonlib/. The top of your experimental sequence file must import the hardware_setup.py file. The file connection_table.py is also importing the same file and does not need to be modified.
+You have to edit your experimental control sequence (as for example FPGA_test.py) and connection_table.py to adapt to your setup. These are simple Python files located in the folder labscript-suite/userlib/labscriptlib/[your apparatus name]. The top of your experimental sequence file must be using the same names and arguments as used in the connection_table.py. The experimental sequence file must contain a subset of connection_table.py. It is important that in connection_table.py you still call start() and stop(1.0) functions. There can be commands between the start() and stop(1.0) but it does not make a difference. The time given to stop must be nonzero but otherwise does not matter. 
   
   The FPGA-SoC device is declared with:
   FPGA_board(name='board0', ip_address=PRIMARY_IP, ip_port=DEFAULT_PORT, bus_rate=1.0, num_racks=2)
@@ -63,3 +68,4 @@ You have to edit your experimental control sequence (as for example FPGA_test.py
     parent_device = AnalogChannels name to which channel is connected. this is name given to AnalogChannels(name=...) but without quotes.
     connection = device address string. can be hex (with '0x') or decimal.
   
+
