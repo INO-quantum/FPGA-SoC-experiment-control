@@ -21,9 +21,3 @@ register_classes(
     BLACS_tab=blacs_tab,
     runviewer_parser=runviewer_parser,
 )
-
-register_classes(
-    'MOGLabs_QRF',
-    BLACS_tab='user_devices.MOGLabs_QRF.MOGLabs_QRF_Tab',
-    #runviewer_parser=runviewer_parser,
-)
