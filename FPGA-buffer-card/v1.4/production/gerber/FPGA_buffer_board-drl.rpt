@@ -1,0 +1,32 @@
+Drill report for /home/andi/Andi/electronics/projects/FPGA_buffer_board/v1.4/FPGA_buffer_board.kicad_pcb
+Created on lun 07 feb 2022 17:50:33 CET
+
+Copper Layer Stackup:
+    =============================================================
+    L1 :  F.Cu                      front
+    L2 :  B.Cu                      back
+
+
+Drill file 'FPGA_buffer_board-PTH.drl' contains
+    plated through holes:
+    =============================================================
+    T1  0,400mm  0,0157"  (169 holes)
+    T2  0,600mm  0,0236"  (140 holes)
+    T3  0,762mm  0,0300"  (64 holes)
+    T4  0,800mm  0,0315"  (2 holes)
+    T5  0,900mm  0,0354"  (6 holes)
+    T6  1,000mm  0,0394"  (80 holes)
+    T7  1,300mm  0,0512"  (2 holes)
+    T8  1,500mm  0,0591"  (5 holes)
+    T9  1,700mm  0,0669"  (20 holes)
+    T10  1,800mm  0,0709"  (5 holes)
+    T11  2,800mm  0,1102"  (2 holes)
+
+    Total plated holes count 495
+
+
+Drill file 'FPGA_buffer_board-NPTH.drl' contains
+    unplated through holes:
+    =============================================================
+
+    Total unplated holes count 0
