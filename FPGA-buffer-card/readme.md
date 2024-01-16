@@ -13,7 +13,7 @@ Version v1.3 features additional buffers which permit to drive two nearby sub-ra
 
 The newest version v1.4 uses a differential clock signal from the clock buffer into the FPGA board and allows to place additional small resistors in series to the signals towards the sub-rack. This should reduce the sensitivity to electrical discharges which sometimes cause that the clock unlocks and gives an error in the software.
 
-Each folder contains the schematics and production files including Gerber and drill files and bill of materials. An additional "shopping list" is provided with the codes from RS or Mouser. The boards are simple double layer with components only one one side. 
+Each folder contains the schematics and production files including Gerber and drill files and bill of materials. An additional "shopping list" is provided with the codes from RS or Mouser. The boards are simple double layer with most components placed on one side. 
 
 >[!IMPORTANT]
 >The buffer card must be configured for the clock input signal which can be either **sine wave** with +10dBm/2Vpp @ 50Ohm around zero or a **LVPECL** signal with 0.8Vpp at ca. 1.3V offset. Please consult the schematics for the details. The clock output is always a 10MHz LVPECL signal. Note that if you try to measure the output clock without the proper load it will stay at the DC offset voltage without oscillations.
