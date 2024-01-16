@@ -170,4 +170,7 @@ This will add a hello-world demo application in the folder /project-spec/meta-us
 
 This will add a demo install script in the folder /project-spec/meta-user/recipes-apps.
 
+> [!NOTE]
+> I have migrated the toolchain to Vivado and Petalinux 2020.1 on Ubuntu 20.04LTS. I could also simplify a little the compilation process by not packaging the custom IP (which randomly caused unsolvable issues). Therefore, some information here is not anymore up-to-date including the source files. I am in the process of updating this soon...
+
 

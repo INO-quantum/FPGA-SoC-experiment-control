@@ -1,88 +1,86 @@
-#!/usr/bin/env python
-##############################################################################################################
-# connection_table.py
-# import global hardware_setup.py file from lbascript-suite/userlib/pythonlib directory
-# importing connection_table.py into individual experimental sequence file does not work!?
-# but importing hardware_setup.py from connection_table.py works.
-# this is much more convenient than to have connection_table defined in EVERY experimental sequence and
-# moreover one needs to change only a single file!
-##############################################################################################################
-from labscript import * #start, stop, AnalogOut, DigitalOut
-from user_devices.FPGA_device import *
+#!/usr/bin/python
 
-from labscript import AnalogOut, DigitalOut
-from user_devices.FPGA_device import FPGA_board, DigitalChannels, AnalogChannels, PRIMARY_IP, SECONDARY_IP, DEFAULT_PORT, generic_conversion
+########################################################################################################################
+# imports
 
-# FPGA device (pseudoclock device)
-#       name = name string.
-#       ip_address = IP address of board
-#       ip_port = port number string
-#       bus_rate = maximum bus output rate in MHz
-#       num_racks = number of connected racks. must be 1 or 2. keep cable as short as possible, otherwise use several boards!
-# each board can drive max. 2 nearby racks with independent device addresses and strobe (96bits per sample).
-# if need more racks or more than few Meter distance use several boards with one as primary board, others are connected as secondary boards.
-primary   = FPGA_board(name='board0', ip_address=PRIMARY_IP, ip_port=DEFAULT_PORT, bus_rate=1.0, num_racks=1)
-if True: # use secondary board
-    secondary = FPGA_board(name='board1', ip_address='192.168.0.12', ip_port=DEFAULT_PORT, bus_rate=1.0, num_racks=1, trigger_device=board0, trigger_connection='secondary')
-else:
-    secondary = None
+import numpy as np
+from labscript import start, stop, add_time_marker, AnalogOut, DigitalOut, DDS, Trigger
+from user_devices.FPGA_device import FPGA_board, DigitalChannels, AnalogChannels, PRIMARY_IP, SECONDARY_IP, DEFAULT_PORT
+from user_devices.generic_conversion import generic_conversion
 
-# digital outputs
-# DigitalChannels: (intermediate device)
-#       name = name of device. give as parent_device to DigitalOut.
-#       parent_device = FPGA_board object. this is name given to FPGA_board(name=...) but without quotes.
-#       connection = device address string. shared by all channels. can be hex (with '0x') or decimal.
-#       rack = 0 or 1
-#       max_channels = maximum number of allowed channels (typically 16)
-# DigitalOut: (individual output channel)
-#       name = name of channel.
-#       parent_device = DigitalChannels object. this is name given to DigitalChannels(name=...) but without quotes.
-#       connection = unique channel number string. can be hex (with '0x') or decimal.
-DigitalChannels(name='DO0'  , parent_device=board0, connection='0x01', rack=0, max_channels = 16)
-for i in range(16):
-    DigitalOut(name='test'+str(i), parent_device=DO0, connection=str(i))
-if secondary:
-    DigitalChannels(name='DO1'  , parent_device=board1, connection='0x01', rack=0, max_channels = 16)
-    for i in range(16):
-        DigitalOut(name='out'+str(i), parent_device=DO1, connection=str(i))
-else:
-    DigitalChannels(name='DO1', parent_device=board0, connection='0x02', rack=0, max_channels=16)
-    for i in range(16):
-        DigitalOut(name='out' + str(i), parent_device=DO1, connection=str(i))
+########################################################################################################################
+# FPGA boards
 
+# primary board:
+# note: importing 'primary' from connection_table does not work with 'FPGA_device(name='primary',...)' but requres to assign primary!
+primary = FPGA_board(name='primary', ip_address="192.168.1.120", ip_port=DEFAULT_PORT, bus_rate=1e6, num_racks=1,trigger_device=pb0_trg,
+    worker_args={ # optional arguments. can be changed in GUI. if defined here used at startup, otherwise last settings in GUI are used.
+        #'inputs':{'start trigger': ('input 1', 'rising edge')},
+        #'outputs': {'output 0': ('sync out', 'low level')}, # required: start trigger for sec. board (default, keep here). other outputs can be added.
+        #'ext_clock':True,  # True = use external clock
+        #'ignore_clock_loss':True # True = ignore when external clock is lost. Message Box is displayed but board keeps running.
+        #'trigger':{}, # no trigger (default)
+        #'trigger':{'start trigger':('input 0', 'rising edge')}, # start trigger
+        #'trigger':{'start trigger':('input 0', 'rising edge'),'stop trigger':('input 1', 'falling edge'),'restart trigger':('input 0', 'rising edge')}, # start+stop+restart trigger
+    }
+    )
+
+# secondary board: (enable with True)
+if False:
+    secondary = FPGA_board(name='secondary', ip_address="192.168.1.131", ip_port=DEFAULT_PORT, bus_rate=1e6, num_racks=1, trigger_device=primary,
+        worker_args={ # optional arguments. can be changed in GUI. if defined here used at startup, otherwise last settings in GUI are used.
+            #'inputs':{'start trigger':('input 0', 'falling edge')},
+                      #'NOP bit':('data bits 20-23','offset bit 0'),
+                      #'STRB bit' : ('data bits 20-23','offset bit 3')}, # required: start trigger from primary board (default, keep here)
+            #'ext_clock': True,  # True = required: use external clock from primary board (default, keep here)
+            #'ignore_clock_loss': True # True = ignore when external clock is lost. Message Box is displayed but board keeps running.
+            # 'trigger':{'start trigger':('input 0', 'falling edge'),'stop trigger':('input 1', 'falling edge'),'restart trigger':('input 1', 'rising edge')}, # start+stop+restart trigger. must be input 1 or 2
+            #'outputs':{'output 0': ('sync out', 'low level'),'output 0': ('lock lost', 'high level')}, example outputs can be added when needed.
+        })
+
+########################################################################################################################
 # analog outputs
-# AnalogChannels: (intermediate device)
-#       name = name of device. give as parent_device to AnalogOut.
-#       parent_device = FPGA_board object. this is name given to FPGA_board(name=...) but without quotes.
-#       rack = 0 or 1
-#       max_channels = maximum number of allowed channels (typically 2 or 4)
-# AnalogOut: (individual output channel)
-#       name = name of channel.
-#       parent_device = AnalogChannels object. this is name given to AnalogChannels(name=...) but without quotes.
-#       connection = device address string. can be hex (with '0x') or decimal.
-AnalogChannels(name='AO0'   , parent_device=board0, rack=0, max_channels = 2)
-AnalogOut     (name='coil_x', parent_device=AO0, connection='0x03' )
-AnalogOut     (name='coil_y', parent_device=AO0, connection='0x04')
 
-AnalogChannels(name='AO1'   , parent_device=board0, rack=0, max_channels = 2)
-AnalogOut     (name='coil_z', parent_device=AO1, connection='0x15')
+AnalogChannels(name='AO0', parent_device=primary, rack=0, max_channels=2)
+AnalogOut     (name='ao0', parent_device=AO0, connection='0x00')
+AnalogOut     (name='ao1', parent_device=AO0, connection='0x01')
 
-AnalogChannels(name='AO2'   , parent_device=board0, rack=0, max_channels = 4)
-AnalogOut     (name='HV_out', parent_device=AO2, connection='0x06',
-               unit_conversion_class=generic_conversion,
-               unit_conversion_parameters={'unit': 'kV', 'equation': 'x*10/1000'})
+AnalogChannels(name='AO1', parent_device=primary, rack=0, max_channels=2)
+AnalogOut     (name='ao2', parent_device=AO1, connection='0x02', unit_conversion_class=generic_conversion,
+               unit_conversion_parameters={'unit':'A', 'equation':'x', 'min':-10.0, 'max':10.0})
+AnalogOut     (name='ao3', parent_device=AO1, connection='0x03', unit_conversion_class=generic_conversion,
+               unit_conversion_parameters={'unit':'MHz', 'equation':'(x-142.31036)/31.31786', 'min':0.0, 'max':455.48896})
 
-if secondary:
-    AnalogChannels(name='AO3'   , parent_device=board1, rack=0, max_channels = 2)
-    AnalogOut     (name='test_x', parent_device=AO3, connection='0x03')
-    AnalogOut     (name='test_y', parent_device=AO3, connection='0x04')
+if secondary is not None:
+    AnalogChannels(name='AO2', parent_device=primary, rack=0, max_channels=4)
+    AnalogOut     (name='ao4', parent_device=AO0, connection='0x04')
+    AnalogOut     (name='ao5', parent_device=AO0, connection='0x05')
+    AnalogOut     (name='ao6', parent_device=AO0, connection='0x06')
+    AnalogOut     (name='ao7', parent_device=AO0, connection='0x07')
 
-##############################################################################################################
+########################################################################################################################
+# digital outputs
 
-##############################################################################################################
-# ATTENTION: start() and stop(1) cannot be missing! time for stop must be >0. 
-##############################################################################################################
-from labscript import start, stop
+DigitalChannels(name='DO0', parent_device=primary, connection='0x0', rack=0, max_channels=16)
+for i in range(16):
+    DigitalOut(name='do%i'%i, parent_device=DO0, connection=0)
+
+if secondary is not None:
+    for i in range(16):
+        DigitalOut(name='do%i'%i+16, parent_device=DO0, connection='0x%02x'%i)
+
+########################################################################################################################
+# experimental sequence
+
 if __name__ == '__main__':
+
+    #t = primary.start_time #note: t is not used here
+    #dt = primary.time_step
+
+    # start sequence
     start()
-    stop(1)
+
+    # stop sequence
+    stop(1.0)
+
+

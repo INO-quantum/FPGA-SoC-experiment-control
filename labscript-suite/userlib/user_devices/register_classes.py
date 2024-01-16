@@ -1,5 +1,7 @@
 #####################################################################
-#####################################################################
+# copy into user_devices folder
+# defines where labscript can find the user defined classes
+
 from labscript_devices import register_classes
 
 blacs_tab = 'user_devices.FPGA_device.FPGA_Tab'
@@ -21,3 +23,5 @@ register_classes(
     BLACS_tab=blacs_tab,
     runviewer_parser=runviewer_parser,
 )
+
+

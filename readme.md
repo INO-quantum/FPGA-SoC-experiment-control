@@ -67,4 +67,7 @@ The FPGA-SoC replaces the DIO64 card but also improves the old system in many wa
   * the board features an USB port which can be configured as device (passive, like a flash drive) or host (active, like your computer). Many modern laboratory equipments allow to be remote controlled via USB (using the USBTMC protocol) or older devices use the GPIB port for which USB-to-GPIB adapters exist. You could directly control such a device from the FPGA-SoC using a simple application running on the CPU or with data which you send via Ethernet.
   * one could implement ramps directly on the board and update only parts of the sequence
 
+> [!NOTE]
+> I am in the phase of updating this page soon...
+
 
