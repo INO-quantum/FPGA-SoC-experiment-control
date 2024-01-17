@@ -62,6 +62,12 @@ if __name__ == '__main__':
         # units of phase = 0..560 in steps of 1 = 0..360° in steps of 360/560°. 360° = 10ns.
         primary.set_sync_params(wait = 0, phase_ext = 0, phase_det = 0)
 
+        # this sets the NOP bit at the given time
+        # if a sample is at this time then the sample is sent to the board but not executed.
+        # if no sample is at this time an empty sample is sent but not executed.
+        # this is for demonstration only. probably you will never need this.
+        #primary.SKIP(time = 10*dt)
+
     # define some experiment parameters
     do_ramp              = True     # perform triangular ramp on all analog channels
     ramp_rate            = 100e3    # sample rate in Hz
