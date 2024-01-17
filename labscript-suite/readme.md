@@ -1,7 +1,7 @@
 # labscript_FPGA-SoC_device
 python code to implement FPGA-SoC board in labscript-suite
 
-##The FPGA-SoC board:
+## The FPGA-SoC board:
 
 The board is used as a low-cost experimental control hardware for controlling cold and ultracold atoms experiments. It is designed to work together with existing hardware placed in a 19" rack and replaces the outdated DIO64 board from Viewpoint Systems. In each rack several plug-in modules can be inserted, like digital or analog outputs which are programmed via a ribbon "bus" cable on the backplane of the rack. A custom [buffer card](/FPGA-buffer-card) was designed to buffer and level-shift the signal from the FPGA-SoC board (3.3V) from the rack (5V) and which hosts clock input and output buffers for an external clock reference and additional buffers for external triggers and to synchronize several boards. The FPGA-SoC board is connected with the Arduino style headers to the buffer card which is directly inserted into the rack and connects to the backplane bus. The setup might be also compatible with similar racks used with other digital I/O cards like the ones from National Instruments. The board is a commercial low-cost board from Digilent, called Cora-Z7. The board has a FPGA-SoC chip from Xilinx (Zynq-7007S), Gigabit Ethernet, USB (device and host) ports and plenty of external pins in an extended Arduino style layout. On the FPGA-SoC (system-on-a-chip) CPU part a simple embedded Linux operating system (Petalinux 2020, kernel 5.4) is running which faciliates proptyping and tests where one can execute custom application generated for example with C/C++ or Python. The second half of the chip is the FPGA (field-programmable gate array) part which contains the custom hardware design (programmed in Verilog) which generates the signals which communicate with the hardware devices on the sub-rack bus. 
 
@@ -9,7 +9,7 @@ Each FPGA-SoC board can drive up to two sub-racks but they should be nearby. If 
 
 The channels (plug-in modules into sub-racks) are distinguished with a 7-bit address which must be unique for each sub-rack. The device-dependent data word is 16-bits long which allows to address 16 digital channels or one 16-bit DAC. The FPGA-SoC puts the address and data word on the bus at the programmed time and after about 300ns (for 1MHz bus update rate; this can be configured) another bit on the bus (called the 'pseudeclock' or 'strobe') goes high and after about 300ns goes low. This triggers the addressed channel to update its output.
 
-##Implementation as a labscript-suite device:
+## Implementation as a labscript-suite device:
 
 The present software implements the FPGA-SoC board as a labscript device. Labscript-suite (https://docs.labscriptsuite.org/) is a free software package written in Python which allows to control ion, cold- or ultracold atoms experiments. It consists of 'runmanager' which generates the experimental sequence data, 'runviewer' which allows to visualize the data like oscilloscope traces and 'BLACS' which interacts with the hardware. The additional program 'Lyse' allows to gather data (like images) and analyze it. The experimental sequence, i.e. the list of actions as a function of time, is saved as Python script file [see example FPGA_test.py](/labscript-suite/userlib/labscriptlib/FPGA_test/FPGA_test.py) which the user edits. A separate file [connection_table.py](/labscript-suite/userlib/labscriptlib/FPGA_test/connection_table.py) is used to declare the hardware and needs to be imported into each experiment script.
 
@@ -19,7 +19,7 @@ Each FPGA board can drive up to 2 sub-racks where the second sub-rack shares the
 
 Several FPGA boards can be declared in the connection table. One of the board must be defined as the primary board (in labscript termed as "master pseudoclock") for which the "trigger_device" entry must be None and for all other boards, called secondary boards, "trigger_device" is set to the name of the primary board. In order to synchronize the boards in time the primary board provides its internal clock on the "clock out" port which needs to be connected with a coaxial cable (and maybe splitter) to the "clock in" of the secondary boards. Alternatively, a shared external clock can be be used instead for all boards. Additionally, the primary board provides a "trigger" (also called "sync out") signal at the start of the experiment which needs to be input to the secondary boards. All output and input signals can be configured by software, either in the connection table, the experimental script or in the BLACS GUI. For examples see [connection_table.py and FPGA_test.py files](/labscript-suite/userlib/labscriptlib/FPGA_test/).
 
-##Steps to get started:
+## Steps to get started:
 
 1. install labscript-suite on your computer as described here: https://docs.labscriptsuite.org/en/stable/installation/
 2. you have to edit the file /labscript-suite/labconfig/\<your computer name\>.ini: give for "apparatus_name" the name of your experiment. This defines in which folder in /labscript-suite/userlib/labscriptlib/ your connection table and experiment script are located. I usually set save_hg_info = False since I have not hg (Mercurial) installed.
