@@ -17,7 +17,9 @@ CAPTION	"FPGA status"
 FONT 8, "MS Sans Serif"
 BEGIN
   // general
-  DEFPUSHBUTTON		"Close"			,ID_EXIT		, 290, 25,  50,  15
+  DEFPUSHBUTTON		"Close"			,ID_EXIT		, 285, 15,  60,  15
+  // general
+  CHECKBOX			TXT_IGNORE_CLOCK_LOSS, ID_IGNORE_CLOCK_LOSS, 285, 35, 60, 15
   // board 0
   GROUPBOX			"board 0"		,IDC_STATIC		,  10,  10, 130, 335
   ICON				IDI_NC			,ID_ICON_0		,  15,  20,  32,  32	,SS_ICON
@@ -61,6 +63,6 @@ BEGIN
   PUSHBUTTON		"config"		,ID_CONFIG		, 290, 245,  50,  15	,WS_DISABLED
   PUSHBUTTON		"send data"		,ID_SEND		, 290, 265,  50,  15	,WS_DISABLED
   PUSHBUTTON		"start"			,ID_START_STOP	, 290, 285,  50,  15	,WS_DISABLED
-  LTEXT				"reps"			,IDC_STATIC	    , 290, 307,  20,  10
+  LTEXT				"run"			,IDC_STATIC	    , 290, 307,  20,  10
   EDITTEXT							,ID_REPS		, 305, 305,  35,  13	,WS_DISABLED
 END

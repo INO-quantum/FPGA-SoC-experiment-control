@@ -1,0 +1,79 @@
+////////////////////////////////////////////////////////////////////////////
+// test data for Dlltest.exe
+// created 14/10/2020 by Andi
+// last change 11/1/2023 by Andi
+// format ASCII, time base 1us
+// decimal numbers or hex numbers if prepended by "0x"
+// separators ' ', ',', '\t', '\n', '\r'
+// comments '/', '#', ';', until end of line '\n', '\r'
+// comments "/*" until "*/"
+// ignored '.', '_'
+// 2 boards = primary + secondary, 12 bytes per sample
+// time is absolute and must be incrementing
+// strobe toggle (address bit 7) for each data must toggle when data should be used.
+// first data is always executed, initial strobe toggle can be 0 or 1
+// TODO: ensure columns = BYTES_PER_SAMPLE/4 and need to insert new line at end.
+////////////////////////////////////////////////////////////////////////////
+// use 'Dlltest -f filename' to upload and run this data on the boards
+// use 'Dlltest -f filename -r 10' to upload and run for 10 repetitions 
+////////////////////////////////////////////////////////////////////////////
+// time in us and A/a and D/d = address and data bits for primary/secondary boards
+// time, 0x00AA_DDDD, 0x00aa_dddd
+// primary board has nothing connected, we skip each 2nd time step.
+// channel 1 on secondary board = TTL output. take all time steps.
+
+      0, 0x0070_1000, 0x0001_0001
+
+ 200000, 0x0071_1001, 0x0081_0003
+ 200001, 0x00f2_1002, 0x0001_0002
+
+ 400000, 0x00f3_1004, 0x0081_0003
+ 400001, 0x0074_1008, 0x0001_0007
+ 400002, 0x0075_1010, 0x0081_0004
+
+ 600000, 0x00f6_1011, 0x0001_0007
+ 600001, 0x00f7_1012, 0x0081_000c
+ 600002, 0x0078_1014, 0x0001_000f
+ 600003, 0x0079_1018, 0x0081_0008
+
+ 800000, 0x00f9_1018, 0x0001_0010
+
+1000000, 0x00f9_1018, 0x0081_0030
+1000001, 0x0079_1018, 0x0001_0020
+ 
+1200000, 0x0079_1018, 0x0081_0030
+1200001, 0x00f9_1018, 0x0001_0070
+1200002, 0x00f9_1018, 0x0081_0040
+
+1400000, 0x0079_1018, 0x0001_0070
+1400001, 0x0079_1018, 0x0081_00c0
+1400002, 0x00f9_1018, 0x0001_00f0
+1400003, 0x00f9_1018, 0x0081_0080
+
+1600000, 0x0079_1018, 0x0001_0100
+
+1800000, 0x0079_1018, 0x0081_0300
+1800001, 0x00f9_1018, 0x0001_0200
+ 
+2000000, 0x00f9_1018, 0x0081_0300
+2000001, 0x0079_1018, 0x0001_0700
+2000002, 0x0079_1018, 0x0081_0400
+
+2200000, 0x00f9_1018, 0x0001_0700
+2200001, 0x00f9_1018, 0x0081_0c00
+2200002, 0x0079_1018, 0x0001_0f00
+2200003, 0x0079_1018, 0x0081_0800
+
+2400000, 0x00f9_1018, 0x0001_1000
+
+2600000, 0x00f9_1018, 0x0081_3000
+2600001, 0x0079_1018, 0x0001_2000
+ 
+2800000, 0x0079_1018, 0x0081_3000
+2800001, 0x00f9_1018, 0x0001_7000
+2800002, 0x00f9_1018, 0x0081_4000
+
+3000000, 0x0079_1018, 0x0001_7000
+3000001, 0x0079_1018, 0x0081_c000
+3000002, 0x00f9_1018, 0x0001_f000
+3000003, 0x00f9_1018, 0x0081_8000

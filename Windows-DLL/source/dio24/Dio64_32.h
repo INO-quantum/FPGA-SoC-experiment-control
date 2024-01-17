@@ -54,27 +54,30 @@ typedef unsigned long ULONG;
 #define DIO64_AI_NONE 0
 
 
-
-#pragma pack(push, 1)
+#ifdef _WIN64
+#pragma pack(push, 8)		// 64-bit labview uses 8-byte data alignment
+#else
+#pragma pack(push, 1)		// 32-bit labview uses no data alignment
+#endif
 typedef struct _DIO64STAT {
 	 USHORT pktsize;
    USHORT portCount;
    USHORT writePtr;
    USHORT readPtr;
    USHORT time[2];
-   ULONG	fifoSize;
-
+   ULONG  fifoSize;
    USHORT fifo0;
    ULONG  ticks;
    USHORT flags;
-   USHORT clkControl;
+   USHORT clkControl; // = divider
    USHORT startControl;
    USHORT stopControl;
    ULONG	AIControl;
    USHORT AICurrent;
    USHORT startTime[2];
    USHORT stopTime[2];
-	 USHORT user[4];
+   ULONG trans;
+   ULONG reps;
 } DIO64STAT;
 #pragma pack(pop)
 
@@ -157,8 +160,8 @@ extern "C" int DLLEXPORT exit_all(void);
 typedef int(__stdcall *_exit_all)(void);
 
 // send test command to board
-extern "C" int DLLEXPORT test(WORD board, void *data);
-typedef int(__stdcall* _test)(WORD board, void *data);
+extern "C" int DLLEXPORT test(WORD board, int n, void *data);
+typedef int(__stdcall* _test)(WORD board, int n, void *data);
 
 // register callback function with given user data
 // set callback = NULL to unregister
@@ -166,8 +169,8 @@ typedef int(__stdcall* _test)(WORD board, void *data);
 // callback is executed by status thread on each status irq
 // ensure callback function is thread-safe and user_data is valid until you unregister callback!
 typedef int(__stdcall *thread_cb)(DWORD time, DWORD status, void *user_data);
-extern "C" int DLLEXPORT register_callback(WORD board, thread_cb callback, void *user_data);
-typedef int(__stdcall *_register_callback)(WORD board, thread_cb callback, void *user_data);
+extern "C" int DLLEXPORT register_callback(WORD board, int n, thread_cb callback, void *user_data);
+typedef int(__stdcall *_register_callback)(WORD board, int n, thread_cb callback, void *user_data);
 
 // file functions
 struct data_info {
@@ -266,5 +269,8 @@ typedef int(__stdcall *_DIO64_In_Start)(WORD board, DWORD ticks, WORD *mask, WOR
 typedef int(__stdcall *_DIO64_In_Stop)(WORD board);
 typedef int(__stdcall *_DIO64_In_Status)(WORD board, DWORD *scansAvail, DIO64STAT *status);
 typedef int(__stdcall *_DIO64_In_Read)(WORD board, WORD *buffer, DWORD scansToRead, DIO64STAT *status);
+
+// default basei_io given to Open/OpenResource
+#define BASE_IO_DEFAULT	0x180		// default base_io
 
 #endif

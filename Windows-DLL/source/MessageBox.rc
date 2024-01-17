@@ -1,0 +1,16 @@
+// modeless dialog box resource for message box
+// created 5/5/2022 by Andi
+// last modified 5/5/2022 by Andi
+#include <windows.h>
+#include <winres.h>
+#include "resource.h"
+
+// dialog box
+IDD_MB DIALOGEX 50, 50, 180, 75
+STYLE WS_POPUP | WS_CAPTION | WS_BORDER
+CAPTION	""
+FONT 12, "MS Sans Serif"
+BEGIN
+  LTEXT        , ""  , ID_MB_TEXT, 10, 10, 160, 30
+  DEFPUSHBUTTON, "OK", ID_MB_OK  , 65, 50,  30, 10
+END
