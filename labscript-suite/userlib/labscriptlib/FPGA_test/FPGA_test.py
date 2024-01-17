@@ -72,7 +72,7 @@ if __name__ == '__main__':
     do_ramp              = True     # perform triangular ramp on all analog channels
     ramp_rate            = 100e3    # sample rate in Hz
     wait_between_digital = False    # wait for each channel when switching digital channels on/off
-    experiment_time      = 3.0      # experiment time in seconds
+    experiment_time      = 5.0      # experiment time in seconds
 
     # switch all digital outputs on
     # this can be done all together or one by one
