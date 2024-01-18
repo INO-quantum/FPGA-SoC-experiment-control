@@ -19,7 +19,7 @@ After the DLL is replaced you will need to make a few changes on the old Labview
 
 ![Figure OpenResource](/Windows-DLL/images/OpenResource.png)
 
-Use a standard string and give it the name for example as "192.168.1.140:49701" with the number before the colon ':' indicating the IP address and that after the colon the port, which by default is set to 49701. Set "board" = 0 and "baseio" = number of boards, i.e. 1 for single board and 2 for primary and secondary board. The default IP address depends on the board version: for v1.2 = 192.168.1.120, for v1.3 = 192.168.1.130 and for v1.4 = 192.168.1.140. 
+Use a standard string and give it the name for example as "192.168.1.140:49701" with the number before the colon ':' indicating the IP address and that after the colon the port, which by default is set to 49701. Set "board" = 0 and "baseio" = number of boards, i.e. 1 for single board and 2 for primary and secondary board. The default IP address depends on the board version:
 
 | board version  | default IP address |
 | :---: | :---: |
@@ -33,4 +33,6 @@ The other DIO64_ functions do not need to be modified. Just ensure that the same
 
 Another advice is to not open and close the board during each loop. This was done with the old DIO card to fix some issues but is not needed for the new FPGA board and just takes unnecessary time on your computer.
 
+> [!IMPORTANT]
+> Ensure all DIO64_ functions are using the returned board identifier from DIO64_OpenResource and to call always DIO64_Close before exiting even on error.
 
