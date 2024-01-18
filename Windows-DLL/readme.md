@@ -17,7 +17,7 @@ After the DLL is replaced you will need to make a few changes on the old Labview
 
 2. depending on how antique your old driver is the "DIO64_Open" or "DIO64_OpenResource" function is used to open the device. Use "DIO64_OpenResource" since it allows to select the IP address of the board as the "resouceName", see Figure:
 
-![Figure OpenResource](/Windows-DLL/OpenResource.png)
+![Figure OpenResource](/Windows-DLL/images/OpenResource.png)
 
 Use a standard string and give it the name as for example as "192.168.1.140:49701" with the number before the colon ':' indicating the IP address and that after the colon the port, which by default is set to 49701. Set "board" = 0 and "baseio" = number of boards, i.e. 1 for single board and 2 for primary and secondary board. The default IP address depends on the board version: for v1.2 its 192.168.1.120, for v1.3 its 192.168.1.130 and for v1.4 its 192.168.1.140. 
 
