@@ -36,6 +36,6 @@ The other `DIO64_` functions do not need to be modified. Just ensure that the sa
 > Do not open and close the board during each loop. This was done with the old DIO card to fix some issues but is not needed for the new FPGA board and just takes unnecessary time on your computer.
 
 > [!IMPORTANT]
-> Ensure all DIO64_ functions are using the returned board identifier from `DIO64_OpenResource` and to call always `DIO64_Close` before exiting even on error!
+> Ensure all DIO64_ functions are using the returned board identifier from `DIO64_OpenResource` and call always `DIO64_Close` before exiting your VI even on error!
 
 
