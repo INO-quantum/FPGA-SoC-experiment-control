@@ -19,7 +19,13 @@ After the DLL is replaced you will need to make a few changes on the old Labview
 
 ![Figure OpenResource](/Windows-DLL/images/OpenResource.png)
 
-Use a standard string and give it the name as for example as "192.168.1.140:49701" with the number before the colon ':' indicating the IP address and that after the colon the port, which by default is set to 49701. Set "board" = 0 and "baseio" = number of boards, i.e. 1 for single board and 2 for primary and secondary board. The default IP address depends on the board version: for v1.2 its 192.168.1.120, for v1.3 its 192.168.1.130 and for v1.4 its 192.168.1.140. 
+Use a standard string and give it the name for example as "192.168.1.140:49701" with the number before the colon ':' indicating the IP address and that after the colon the port, which by default is set to 49701. Set "board" = 0 and "baseio" = number of boards, i.e. 1 for single board and 2 for primary and secondary board. The default IP address depends on the board version: for v1.2 = 192.168.1.120, for v1.3 = 192.168.1.130 and for v1.4 = 192.168.1.140. 
+
+| board version  | default IP address |
+| :---: | :---: |
+| v1.2 | 192.168.1.120 |
+| v1.3 | 192.168.1.130 |
+| v1.4 | 192.168.1.140 |
 
 The returned error cluster of DIO64_OpenResource needs to be unbundled and when the code is > 0 then there is no error but the code converted to U16 is the board identifier which needs to be given to **all** following DIO64_ functions as "board in". This ensures that the board can be accessed only from one application at a time. See the figure how to unbundle and to get the board identifier. The error cluster needs then to be reset to the "all ok" state, otherwise Labview thinks there is an error.
 
