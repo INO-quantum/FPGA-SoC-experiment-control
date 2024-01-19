@@ -2,10 +2,13 @@
 
 In order do allow a fast and easy revertible transition from the old Viewpoint Systems `DIO64` card to the new FPGA-SoC control system, I provide here a Windows dynamic-link-library (DLL) with the same functions as the DLL of the original Viewpoint Systems driver. By just replacing the old DLL with the new one, any software used to control the old system will be able to control the new FPGA-SoC system with only minor changes. Reverting back to the original control system can be done by switching back to the original DLL.
 
-As control software we historically use in our laboratories Labview or Labwindows/CVI from National Instruments, but the described exchange of the DLL works for any other software as well. 
+As control software we historically use in our laboratories Labview or Labwindows/CVI from National Instruments on Windows PC, but the described exchange of the DLL works for any other software on Windows as well[^1]. 
 
 > [!TIP]
 > For a fresh install of your control system, the old driver does not need to be installed. Just place the 64bit DLL into "C:/Windows/System32". 
+
+> [!TIP]
+> Since the new control system does not need to install hardware and no driver is needed, there are no constraints anymore on your control computer hardware, software and operating system! You can upgrade your computer to 64bit Windows, Linux or MAC[^1]. You might also consider of using the open and Python-based control platform [labscript-suite](/labscript-suite) for which I provide the necessary Python files.
 
 Here you find the compiled DLL for [32bit Windows](/Windows-DLL/Windows-DLL-x86) and [64bit Windows](/Windows-DLL/Windows-DLL-x64). Since the old DLL was only available for 32bit Windows your old control system version must have been also 32bit, but the new one can be also 64bit. I provide 3 files, the dynamic link library (.dll), the static link library (.lib), and a command-line executable (.exe) which allows you to directly test the DLL and the communication with the FPGA-SoC board:
 
@@ -16,16 +19,17 @@ Here you find the compiled DLL for [32bit Windows](/Windows-DLL/Windows-DLL-x86)
 > [!CAUTION]
 > DLLtest.exe can send and execute random data on the board(s)! Do not connect real devices on the board while using this software! Use `DLLtest.exe -h` to get help on how to use this tool.
 
-> [!TIP]
-> Since the new control system does not need to install hardware and no driver is needed, there are no constraints anymore on your control computer hardware, software and operating system! You can upgrade your computer to 64bit Windows, Linux or MAC[^1]. You might also consider of using the open and Python-based control platform [labscript-suite](/labscript-suite) for which I provide the necessary Python files.
-
 In the [source](/Windows-DLL/source) folder you find the source files for the DLL and the Visual Studio 2019 project to generate the DLL.
+
+## Replace DLL
 
 To replace the DLL you have to "hide" the original DLL from Labview by moving it into a different folder outside of the labview project, otherwise Labview will find it again. Do not delete it, so you can revert the changes if needed. When you start your Labview VI it will start searching for the old DLL, stop it and give the path to the new DLL. The old DLL is either located in one of your Labview constrol system folders or, when properly installed, in one of the Windows folders "C:/Windows/System32" or "C:/Windows/SysWOW64".
 
 The library (.lib) is used for static linking and is needed only with Labwindows/CVI. It might be located in "C:/Program Files (x86)/ViewpointSystems/DIO64/Visual C/". You have to manually select the new library and recompile the project. 
 
-After the DLL is replaced you will need to make a few changes on the old Labview program. Similar changes need to be done on Labwindows/CVI.
+## Update of Labview
+
+After the DLL is replaced you will need to make a few changes on the old Labview program. Similar changes need to be done on Labwindows/CVI or any other control software.
 
 1. first check that all `DIO64_` function VI's ('Virtual Instrument's) use the new DLL by double-clicking, open Block Diagram, and double-clicking on the "Call Library Function Node", where you should find in the "Function" tab the path to the DLL. 
 
