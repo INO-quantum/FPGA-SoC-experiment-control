@@ -1,0 +1,185 @@
+#!/bin/sh
+# last change 2023/09/30 by Andi
+
+echo "fpga-init v1.1 by Andi"
+
+#default IP address
+INET="192.168.1.130"
+MASK="255.255.255.0"
+
+#device names
+device0="dio24dev"
+device1="dma24dev"
+
+#SD card mounting point
+SD="/dev/mmcblk0p1"
+mnt="/mnt/sd/"
+
+#configuration file
+config="server.config"
+info="info"
+IP="IP"
+port="port"
+strobe0="strobe_0"
+strobe1="strobe_1"
+primary="primary"
+cpus="CPUs"
+waittime="wait"
+phase="phase"
+
+#files and folders to remove from SD card
+svi="System Volume Information"
+result="result.csv"
+steps="steps.csv"
+
+echo "fpga-init: mounting SD card on $mnt"
+mkdir $mnt
+mount $SD $mnt
+
+#if file exists then read information
+if [ -f $mnt$config ]; then
+
+#print info line
+info=`awk -F'=' "\\$1==\"$info\" {print \\$2}" $mnt$config`
+if [ "$info" != "" ]; then
+echo "fpga-init: info     = $info"
+fi
+
+#read IP address
+new_IP=`awk -F'=' "\\$1==\"$IP\" {print \\$2}" $mnt$config`
+if [ "$new_IP" = "" ]; then
+new_IP=$INET
+echo "fpga-init: IP       = $new_IP <default>"
+else 
+echo "fpga-init: IP       = $new_IP"
+fi
+
+#read optional server port
+new_port=`awk -F'=' "\\$1==\"$port\" {print \\$2}" $mnt$config`
+if [ "$new_port" == "" ]; then
+new_port="."
+echo "fpga-init: port     = <default>"
+else
+echo "fpga-init: port     = $new_port"
+fi
+
+#read optional strobe 0
+strb0=`awk -F'=' "\\$1==\"$strobe0\" {print \\$2}" $mnt$config`
+if [ "$strb0" == "" ]; then
+strb0="."
+echo "fpga-init: strobe 0 = <default>"
+else
+echo "fpga-init: strobe 0 = $strb0"
+fi
+
+#read optional strobe 1
+strb1=`awk -F'=' "\\$1==\"$strobe1\" {print \\$2}" $mnt$config`
+if [ "$strb1" == "" ]; then
+strb1="."
+echo "fpga-init: strobe 1 = <default>"
+else
+echo "fpga-init: strobe 1 = $strb1"
+fi
+
+#read optional primary settings
+prim=`awk -F'=' "\\$1==\"$primary\" {print \\$2}" $mnt$config`
+if [ "$prim" == "" ]; then
+prim="."
+echo "fpga-init: primary  = <default>"
+else
+echo "fpga-init: primary  = $prim"
+fi
+
+#read optional number of CPUs
+cpu=`awk -F'=' "\\$1==\"$CPUs\" {print \\$2}" $mnt$config`
+if [ "$cpu" == "" ]; then
+cpu="."
+echo "fpga-init: CPUs     = <default>"
+else
+echo "fpga-init: CPUs     = $cpu"
+fi
+
+#read optional wait time
+wtime=`awk -F'=' "\\$1==\"$waittime\" {print \\$2}" $mnt$config`
+if [ "$wtime" == "" ]; then
+wtime="."
+echo "fpga-init: wait     = <default>"
+else
+echo "fpga-init: wait     = $wtime"
+fi
+
+#read optional sync phase
+ph=`awk -F'=' "\\$1==\"$phase\" {print \\$2}" $mnt$config`
+if [ "$ph" == "" ]; then
+ph="."
+echo "fpga-init: phase    = <default>"
+else
+echo "fpga-init: phase    = $ph"
+fi
+
+else
+#config file not found
+new_IP=$INET
+new_port="."
+strb0="."
+strb1="."
+prim="."
+cpu="."
+wtime="."
+ph="."
+echo "fpga-init: '$config' not found (using defaults)."
+
+fi
+
+#remove Windows "System Volume Information" folder and content
+#otherwise new files might not be seen/deleted on Windows!
+if [ -d "$mnt$svi" ]; then
+echo "fpga-init: removing '$svi'"
+rm -r "$mnt$svi"
+fi
+
+#remove old result file
+if [ -f "$mnt$result" ]; then
+echo "fpga-init: removing '$result'"
+rm "$mnt$result"
+fi
+
+#remove old steps file
+if [ -f "$mnt$steps" ]; then
+echo "fpga-init: removing '$steps'"
+rm "$mnt$steps"
+fi
+
+#unmount SD card for save removal
+echo "fpga-init: unmounting SD card"
+umount $SD
+rmdir $mnt
+
+# set IP address. this can be done only after eth0 is configured, so we do it in server.
+echo "fpga-init: IP address = "$new_IP", net mask = "$MASK" (set by server)"
+#ifconfig eth0 inet $new_IP netmask $MASK up
+
+#echo "create device"
+##id
+#cd /lib/modules/4.9.0-xilinx-v2017.4/extra
+##ls
+#echo "modprobe dio-24.ko myint=123 mystr=test"
+#echo
+#modprobe dio24.ko myint=123 mystr="test"
+
+major=`awk "\\$2==\"$device0\" {print \\$1}" /proc/devices`
+echo "fpga-init: create "$device0" device node ("$major")"
+mknod /dev/${device0}0 c $major 0
+
+major=`awk "\\$2==\"$device1\" {print \\$1}" /proc/devices`
+echo "fpga-init: create "$device1" device node ("$major")"
+mknod /dev/${device1}0 c $major 0
+#cd
+
+echo "fpga-init: starting fpga-server ..."
+#the & starts server in separate thread
+/usr/bin/fpga-server -s -I $new_IP -P $new_port -b $strb0 -b $strb1 -p $prim -c $cpu -w $wtime -f $ph &
+
+echo "fpga-init: done"
+
+

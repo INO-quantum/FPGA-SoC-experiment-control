@@ -6,11 +6,11 @@ The project has several folders. Look at the readme.md files for specific instru
 
 ```
 ├── firmware-release        firmware to be saved on the SD card
-├── FPGA-buffer-card        schematics and production files of buffer card 
+├── buffer-card             schematics and production files of buffer card 
 │   ├── v1.2                board version v1.2
 │   ├── v1.3                board version v1.3
 │   └── v1.4                board version v1.4
-├── FPGA-firmware           firmware source for Vivado and Petalinux
+├── firmware-source         firmware source for Vivado and Petalinux
 │   ├── Petalinux_2017.4
 │   └── Vivado_2017.4
 ├── labscript-suite         labscript-suite implementation
