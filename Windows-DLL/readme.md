@@ -57,10 +57,8 @@ The returned error cluster of `DIO64_OpenResource` needs to be unbundled and whe
 > [!IMPORTANT]
 > Ensure all `DIO64_` functions are using the returned board identifier from `DIO64_OpenResource` and call always `DIO64_Close` before exiting your VI even on error!
 
-test [firmware source](../FPGA-firmware/)
-
 [^1]: I regularly run the FPGA-SoC system from Ubuntu (with labscript-suite) but I have no Apple MAC computer at hand for testing. But I do no see a reason why it should not work. The source files here are heavily Windows-specific such that I do not recommend to modify them to allow compilation also on Unix systems. However, the communciation with the board is quite simple and it should not be much work to make a new library (.so or .dylib). Please let me know if this would be appreciated!
-[^2]: We use only static IP's in the local network of each laboratory. If you need to dynamically allocate the IP via DHCP let me know, or modify `FPGA-init` in the [firmware source](../../FPGA-firmware/) and recompile it with Petalinux.
+[^2]: We use only static IP's in the local network of each laboratory. If you need to dynamically allocate the IP via DHCP let me know, or modify `FPGA-init` in the [firmware source](/FPGA-firmware/) and recompile it with Petalinux.
 
 
 
