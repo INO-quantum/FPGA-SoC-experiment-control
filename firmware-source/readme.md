@@ -11,18 +11,23 @@ If you are looking for ready-to-use firmware files please have a look at the [fi
 
 ## Hardware implementation:
 
-The Hardware logic is generated with Vivado 2020.1 from Xilinx running on Ubuntu 20.04 LTS (Vivado is available also for Windows). Vivado WebPACK can be downloaded for free and supports the 7-Series SoC devices from Xilinx which are used in this project. For instructions on how to install Vivado 2020.1 [see here](https://docs.xilinx.com/v/u/2020.1-English/ug973-vivado-release-notes-install-license). See also the very good [tutorial from Digilent](https://digilent.com/reference/programmable-logic/guides/installing-vivado-and-vitis). For this project Vitis is not needed but for debugging it can be useful and if you want to test `baremetal` projects you will need it. During the installation ensure support for the Zynq-7000 series is enabled. I have tested the Windows and Linux versions and have not seen a big difference. Officially, Ubuntu 18.04 LTS is required but installation on 20.04 LTS was working.
+The Hardware logic is generated with Vivado 2020.1 from Xilinx running on Ubuntu 20.04 LTS (Vivado is available also for Windows). Vivado WebPACK can be downloaded for free and supports the Zynq 7000 series SoC devices from Xilinx which are used in this project. For instructions on how to install Vivado 2020.1 [see UG973 from Xilinx](https://docs.xilinx.com/v/u/2020.1-English/ug973-vivado-release-notes-install-license). See also the very good [tutorial from Digilent](https://digilent.com/reference/programmable-logic/guides/installing-vivado-and-vitis). For this project Vitis is not needed but for debugging it can be useful and if you want to test `baremetal` projects you will need it. During the installation ensure support for the Zynq-7000 series is enabled. I have tested the Windows and Linux versions and have not seen a big difference. Officially, Ubuntu 18.04 LTS is required but installation on 20.04 LTS was working.
 
 <!--check my notes!-->
 
-On Windows you should have a shortcut on the desctop. On Ubuntu 20.04 LTS you need to launch Vivado from the terminal like this:
+On Windows you should have a shortcut on the desctop or type Vivado in the search box of the task bar. On Ubuntu 20.04 LTS you need to launch Vivado from the terminal like this:
 
     cd \<working folder\>
-    source ~/Xilinx/Vivado/2020.1/settings64.sh
+    source /opt/Xilinx/Vivado/2020.1/settings64.sh
     export LC_ALL=C
     vivado
     
-This assumes Vivado was installed in `~/Xilinx/Vivado/2020.1`. Do not execute `vivado` in your home folder since it will contaminate it with temporary files. It is best to create a working folder for this purpose. The important `export` command you can also add to the settings64.sh so you do not forget it. The `cd` command I do not recommend to insert since some tools/scripts execute settings64.sh automatically and will end then in an unexpected folder. 
+This assumes Vivado was installed in the standard location[^1]. Do not execute `vivado` in your home folder since it will contaminate it with temporary files. It is best to create a working folder for this purpose. The important `export` command you can also add to the settings64.sh so you do not forget it. The `cd` command I do not recommend to insert since some tools/scripts execute settings64.sh automatically and will end then in an unexpected folder. 
+
+[^1]: I prefer to install Vivado in the home directory `~/Xilinx/Vivado/`.
+
+> [!Note]
+> By sourcing `settings64.sh` manually you can easily switch between different versions of Vivado. This might be needed since projects generated with one version usually make troubles when trying to use with another version.
 
 After Vivado is installed you need to download and copy the [board files from Digilent](https://reference.digilentinc.com/vivado/installing-vivado/start#installing_digilent_board_files).
 
