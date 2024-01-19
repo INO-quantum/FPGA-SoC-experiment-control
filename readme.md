@@ -26,8 +26,6 @@ The project has several folders. Look at the readme.md files for specific instru
     ├── source              source
     │   ├── dio24           header files
     │   └── dio64_32        Visual studio project folder
-    │       ├── dio64_32
-    │       └── Dlltest
     ├── Windows-DLL-x64     compiled 64bit Windows DLL
     └── Windows-DLL-x86     compiled 32bit Windows DLL
 ```
