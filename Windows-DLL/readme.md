@@ -1,18 +1,29 @@
 # Windows DLL
 
-This is the Visual Studio 2019 (Community) project to generate the Windows dynamic-link-library (DLL) which directly replaces the libraries (DLL and lib) of the Viewpoint Systems driver for the dio64 I/O card. A simple command-line test probram (Dlltest.exe) is also provided to fast test the functionality.
+In order do allow a fast and easily revertible transition from the old Viewpoint Systems `DIO64` card to the new FPGA-SoC control system, I provide here a Windows dynamic-link-library (DLL) with the same functions as the library of the original Viewpoint Systems driver. By just replacing the old DLL with the new one, any software used to control the old system will be able to control the new FPGA-Soc system with only minor changes. Reverting back to the original control system can be done by switching back to the original DLL. 
+
+> [!TIP]
+> For a fresh install of your control system, the old driver does not need to be installed. Just place the 64bit DLL into "C:/Windows/System32". 
+
+Here you find the compiled DLL for [32bit Windows](/Windows-DLL/Windows-DLL-x86) and [64bit Windows](/Windows-DLL/Windows-DLL-x64). Since the old DLL was only available for 32bit Windows your old Labview/Labwindows/CVI version must have been also 32bit. I provide 3 files, the dynamic link library (.dll), the static link library (.lib), which is needed by LabWindows/CVI and a command-line executable (.exe) which allows you to test the DLL:
 
     dio64-32.dll
     dio64-32.lib
     Dlltest.exe
 
-To replace the DLL you have to "hide" the original DLL from Labview by moving it into a different folder but which cannot be a sub-folder of the labview project since Labview will find it again. Do not delete it but keep it in a separate folder outside of the projct - in case you need to revert the changes. Place the new DLL either at the old DLL location or into another sub-folder. Labview will notice that the DLL and path has changed and will search for it automatically. Stop the search and give the path to the new DLL. On newer computers the old DLL is located in one of the folders "C:/Windows/System32" or "C:/Windows/SysWOW64" and the library might be in "C:/Program Files (x86)/ViewpointSystems/DIO64/Visual C/".
+> [!ATTENTION]
+> DLLtest.exe can send and execute random data on the board(s)! Do not connect real devices on the board while using this software! Use `DLLtest.exe -h` to get help on how to use this tool.
 
-I have implemented the same functions as the old DLL (plus some additional ones) with the same calling convention and compiled if for [32bit Windows](/Windows-DLL/Windows-DLL-x86) and [64bit Windows](/Windows-DLL/Windows-DLL-x64). This allows to use the same control program as before, but instead of communicating with the driver on the same PC, communication goes via Ethernet with the FPGA-SoC board. Since the old DLL was only available for 32bit Windows your Labview/Labwindows/CVI version must have been also 32bit but after the upgrade to the new control system you can consider upgrading also your control computer and Windows. Since no driver is needed anymore there are no constraints anymore on your control computer hardware, software and operating system. You might even consider of using [labscript-suite](/labscript-suite) as an alternative control platform for which I have provided the necessary python files. Nevertheless, I provide here the Windows DLL such that the transition can be done smooth and hopefully without many problems.
+> [!TIP]
+> Since the new control system does not need a driver, there are no constraints anymore on your control computer hardware, software and operating system! You can upgrade your computer to 64bit Windows, Linux or MAC (not tested). You might also consider of using the open and Python-based control platform [labscript-suite](/labscript-suite) for which I provide the necessary Python files.
 
-The library (.lib) is used for static linking and is needed only with Labwindows/CVI. You need to manually recompile the source with the new library selected. 
+In the [source](/Windows-DLL/source) folder you find the source files for the DLL and the Visual Studio 2019 project to generate the DLL.
 
-After the DLL is replaced you will need to make a few changes on the old Labview program - and similar on Labwindows/CVI:
+To replace the DLL you have to "hide" the original DLL from Labview by moving it into a different folder outside of the labview project, otherwise Labview will find it again. Do not delete it, so you can revert the changes if needed. When you start your Labview VI it will start searching for the old DLL, stop it and give the path to the new DLL. The old DLL is either located in one of your Labview constrol system folders or, when properly installed, in one of the Windows folders "C:/Windows/System32" or "C:/Windows/SysWOW64".
+
+The library (.lib) is used for static linking and is needed only with Labwindows/CVI. It might be located in "C:/Program Files (x86)/ViewpointSystems/DIO64/Visual C/". You have to manually select the new library and recompile the project. 
+
+After the DLL is replaced you will need to make a few changes on the old Labview program. Similar changes need to be done on Labwindows/CVI.
 
 1. first check that all `DIO64_` function VI's ('Virtual Instrument's) use the new DLL by double-clicking, open Block Diagram, and double-clicking on the "Call Library Function Node", where you should find in the "Function" tab the path to the DLL. 
 
