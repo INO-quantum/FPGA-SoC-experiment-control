@@ -1,8 +1,41 @@
-# FPGA-SoC_experiment_control
+# FPGA-SoC experiment control system
 
 ## Project structure
 
-The project has several folders. Look at the readme.md files there for specific instructions.
+The project has several folders. Look at the readme.md files for specific instructions.
+
+```
+├── firmware-release             
+├── FPGA-buffer-card
+│   ├── v1.2
+│   │   └── production
+│   │       └── gerber
+│   ├── v1.3
+│   │   └── production
+│   │       ├── gerber
+│   │       └── gerber_drill_X2
+│   └── v1.4
+├── FPGA-firmware
+│   ├── Petalinux_2017.4
+│   └── Vivado_2017.4
+├── labscript-suite
+│   └── userlib
+│       ├── labscriptlib
+│       │   └── FPGA_test
+│       └── user_devices
+├── paper
+│   ├── data
+│   └── schematics
+└── Windows-DLL
+    ├── images
+    ├── source
+    │   ├── dio24
+    │   └── dio64_32
+    │       ├── dio64_32
+    │       └── Dlltest
+    ├── Windows-DLL-x64
+    └── Windows-DLL-x86
+```
 
 
 | folder                         | description                          | toolchain            | language            |
@@ -16,6 +49,10 @@ The project has several folders. Look at the readme.md files there for specific 
 | paper                          | publication about FPGA-Soc           | -                    | -                   |
 | paper/data                     | data and analysis used in paper      | -                    | Python 3            |
 | paper/schematics               | electronic scheme used for auto-sync | KiCad 5.1            | -                   |
+
+
+
+
 
 ## Project Overview
 
