@@ -5,39 +5,34 @@
 The project has several folders. Look at the readme.md files for specific instructions.
 
 ```
-├── firmware-release                firmware to be saved on the SD card
-├── FPGA-buffer-card                schematics and production files of buffer card 
-│   ├── v1.2
-│   │   └── production
-│   │       └── gerber
-│   ├── v1.3
-│   │   └── production
-│   │       ├── gerber
-│   │       └── gerber_drill_X2
-│   └── v1.4
-├── FPGA-firmware                   firmware source
+├── firmware-release        firmware to be saved on the SD card
+├── FPGA-buffer-card        schematics and production files of buffer card 
+│   ├── v1.2                board version v1.2
+│   ├── v1.3                board version v1.3
+│   └── v1.4                board version v1.4
+├── FPGA-firmware           firmware source for Vivado and Petalinux
 │   ├── Petalinux_2017.4
 │   └── Vivado_2017.4
-├── labscript-suite
+├── labscript-suite         labscript-suite implementation
 │   └── userlib
 │       ├── labscriptlib
-│       │   └── FPGA_test
-│       └── user_devices
-├── paper
-│   ├── data
-│   └── schematics
-└── Windows-DLL
+│       │   └── FPGA_test   connection table and example script
+│       └── user_devices    user device
+├── paper                   publication
+│   ├── data                data used for publication
+│   └── schematics          cable driver schematics
+└── Windows-DLL             Windows DLL sources
     ├── images
-    ├── source
-    │   ├── dio24
-    │   └── dio64_32
+    ├── source              source
+    │   ├── dio24           header files
+    │   └── dio64_32        Visual studio project folder
     │       ├── dio64_32
     │       └── Dlltest
-    ├── Windows-DLL-x64
-    └── Windows-DLL-x86
+    ├── Windows-DLL-x64     compiled 64bit Windows DLL
+    └── Windows-DLL-x86     compiled 32bit Windows DLL
 ```
 
-
+<!--
 | folder                         | description                          | toolchain            | language            |
 |--------------------------------|--------------------------------------|----------------------|---------------------|
 | firmware-release               | firmware to be saved on SD card      | -                    | - 
@@ -49,10 +44,7 @@ The project has several folders. Look at the readme.md files for specific instru
 | paper                          | publication about FPGA-Soc           | -                    | -                   |
 | paper/data                     | data and analysis used in paper      | -                    | Python 3            |
 | paper/schematics               | electronic scheme used for auto-sync | KiCad 5.1            | -                   |
-
-
-
-
+-->
 
 ## Project Overview
 
