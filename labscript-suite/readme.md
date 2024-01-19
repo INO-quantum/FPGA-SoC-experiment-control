@@ -1,5 +1,6 @@
-# labscript_FPGA-SoC_device
-python code to implement FPGA-SoC board with labscript-suite
+# labscript FPGA-SoC device
+
+Python code to implement FPGA-SoC board with labscript-suite
 
 ## The FPGA-SoC board
 
