@@ -6,28 +6,28 @@ The project has several folders. Look at the readme.md files for specific instru
 
 ```
 ├── firmware-release        firmware to be saved on the SD card
-├── buffer-card             schematics and production files of buffer card 
-│   ├── v1.2                board version v1.2
-│   ├── v1.3                board version v1.3
-│   └── v1.4                board version v1.4
 ├── firmware-source         firmware source for Vivado and Petalinux
-│   ├── Petalinux_2017.4
-│   └── Vivado_2017.4
+│   ├── 2017.4
+│   └── 2020.1              newest version
+├── Windows-DLL             Windows DLL sources
+│   ├── images
+│   ├── source              source files
+│   │   ├── dio24           header files
+│   │   └── dio64_32        Visual studio project folder
+│   ├── Windows-DLL-x64     compiled 64bit Windows DLL
+│   └── Windows-DLL-x86     compiled 32bit Windows DLL
 ├── labscript-suite         labscript-suite implementation
 │   └── userlib
 │       ├── labscriptlib
 │       │   └── FPGA_test   connection table and example script
 │       └── user_devices    user device
-├── paper                   publication
-│   ├── data                data used for publication
-│   └── schematics          cable driver schematics
-└── Windows-DLL             Windows DLL sources
-    ├── images
-    ├── source              source
-    │   ├── dio24           header files
-    │   └── dio64_32        Visual studio project folder
-    ├── Windows-DLL-x64     compiled 64bit Windows DLL
-    └── Windows-DLL-x86     compiled 32bit Windows DLL
+├── buffer-card             schematics and production files of buffer card 
+│   ├── v1.2                board version v1.2
+│   ├── v1.3                board version v1.3
+│   └── v1.4                board version v1.4
+└── paper                   publication
+    ├── data                data used for publication
+    └── schematics          cable driver schematics
 ```
 
 <!--

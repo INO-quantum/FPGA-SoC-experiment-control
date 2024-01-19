@@ -1,16 +1,30 @@
 # FPGA firmware
 
-This folder contains the firmware running on the board. 
+This folder contains the source files needed for building the firmware for the Cora-Z7 board. The building process can be divided into two main steps: 
 
-It is divided into the hardware logic implementation (Vivado) and the software part running on the CPU/Linux (Petalinux)
+1. generate the hardware logic on the FPGA part using Vivado (2020.1)
+2. generate the Linux image and software running on the CPU with Petalinux (2020.1)
+
+These software tools are very heavy and not easy to use and Vivado randomly crashes. First time compilation can take easily 15 minutes and for Petalinux several additional resources need to be downloaded from the internet. After the first successful compilation the compile time is reduced but at least 5 minutes per iteration makes debugging still very tedious.
+
+If you are looking for ready-to-use firmware files please have a look at the [firmware-release folder](/firmware-release), select the folder corresponding to your FPGA-SoC board and the version of your buffer card and choose primary or secondary board.
 
 ## Hardware implementation:
 
-  The Hardware is generated with the Vivado 2017.4 software from Xilinx running on Ubuntu 18.04 LTS (Vivado is available also for Windows). Vivado WebPACK can be downloaded for free and supports the 7-Series SoC devices from Xilinx which are used in this project. For instructions on how to install Vivado 2017.4 see here: https://www.xilinx.com/support/documentation/sw_manuals/xilinx2017_4/ug973-vivado-release-notes-install-license.pdf. See also this tutorial: https://reference.digilentinc.com/vivado/installing-vivado/start. I have tested the Windows and Linux versions. Officially, Ubuntu 16.04.2 LTS is required but installation on 18.04 LTS was working (except of rare crashes). There are a few dependencies and the installer will tell you what is missing. 
+The Hardware logic is generated with Vivado 2020.1 from Xilinx running on Ubuntu 20.04 LTS (Vivado is available also for Windows). Vivado WebPACK can be downloaded for free and supports the 7-Series SoC devices from Xilinx which are used in this project. For instructions on how to install Vivado 2020.1 [see here](https://docs.xilinx.com/v/u/2020.1-English/ug973-vivado-release-notes-install-license). See also the very good [tutorial from Digilent](https://digilent.com/reference/programmable-logic/guides/installing-vivado-and-vitis). For this project Vitis is not needed but for debugging it can be useful and if you want to test `baremetal` projects you will need it. During the installation ensure support for the Zynq-7000 series is enabled. I have tested the Windows and Linux versions and have not seen a big difference. Officially, Ubuntu 18.04 LTS is required but installation on 20.04 LTS was working.
 
-I had only one bigger issue with Python - I think 3.5 is required - which I had installed but the installer did not recognize it. When I did this the first time, installing Python 2.7 was resolving the issue, the second time this did not help but somehow I have got it working without knowing how (I installed and disinstalled different versions of Python several times and in different ways). I tried to install Vivado on Ubuntu 20.04 LTS but I did not managed to solve the Python issue (should be solvable with better knowledge of Python and how its installation works). I worked initially with Vivado 2018.1 and then 2018.3 but I had many problems and finally downgraded to 2017.4 which seems to be more stable. Also, the board support package for the Cora-Z7 board from Digilent require Petalinux 2017.4, which is designed to work with Vivado 2017.4.
+<!--check my notes!-->
 
-After Vivado is installed you need to download and copy the board files from Digilent: https://reference.digilentinc.com/vivado/installing-vivado/start#installing_digilent_board_files.
+On Windows you should have a shortcut on the desctop. On Ubuntu 20.04 LTS you need to launch Vivado from the terminal like this:
+
+    cd \<working folder\>
+    source ~/Xilinx/Vivado/2020.1/settings64.sh
+    export LC_ALL=C
+    vivado
+    
+This assumes Vivado was installed in `~/Xilinx/Vivado/2020.1`. Do not execute `vivado` in your home folder since it will contaminate it with temporary files. It is best to create a working folder for this purpose. The important `export` command you can also add to the settings64.sh so you do not forget it. The `cd` command I do not recommend to insert since some tools/scripts execute settings64.sh automatically and will end then in an unexpected folder. 
+
+After Vivado is installed you need to download and copy the [board files from Digilent](https://reference.digilentinc.com/vivado/installing-vivado/start#installing_digilent_board_files).
 
 ### Generate the Vivado project:
 
@@ -171,6 +185,6 @@ This will add a hello-world demo application in the folder /project-spec/meta-us
 This will add a demo install script in the folder /project-spec/meta-user/recipes-apps.
 
 > [!NOTE]
-> I have migrated the toolchain to Vivado and Petalinux 2020.1 on Ubuntu 20.04LTS. I could also simplify a little the compilation process by not packaging the custom IP (which randomly caused unsolvable issues). Therefore, some information here is not anymore up-to-date including the source files. I am in the process of updating this soon...
+> I have migrated the toolchain to Vivado and Petalinux 2020.1 on Ubuntu 20.04LTS. I could also simplify a little the compilation process by not packaging the custom IP (which randomly caused unsolvable issues). Therefore, some information here is not anymore up-to-date. I am in the process of updating this soon...
 
 
