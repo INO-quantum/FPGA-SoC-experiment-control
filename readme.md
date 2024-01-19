@@ -5,8 +5,8 @@
 The project has several folders. Look at the readme.md files for specific instructions.
 
 ```
-├── firmware-release             
-├── FPGA-buffer-card
+├── firmware-release                firmware to be saved on the SD card
+├── FPGA-buffer-card                schematics and production files of buffer card 
 │   ├── v1.2
 │   │   └── production
 │   │       └── gerber
@@ -15,7 +15,7 @@ The project has several folders. Look at the readme.md files for specific instru
 │   │       ├── gerber
 │   │       └── gerber_drill_X2
 │   └── v1.4
-├── FPGA-firmware
+├── FPGA-firmware                   firmware source
 │   ├── Petalinux_2017.4
 │   └── Vivado_2017.4
 ├── labscript-suite
