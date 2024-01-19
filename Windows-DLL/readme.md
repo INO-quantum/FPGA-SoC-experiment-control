@@ -1,21 +1,23 @@
 # Windows DLL
 
-In order do allow a fast and easily revertible transition from the old Viewpoint Systems `DIO64` card to the new FPGA-SoC control system, I provide here a Windows dynamic-link-library (DLL) with the same functions as the library of the original Viewpoint Systems driver. By just replacing the old DLL with the new one, any software used to control the old system will be able to control the new FPGA-Soc system with only minor changes. Reverting back to the original control system can be done by switching back to the original DLL. 
+In order do allow a fast and easy revertible transition from the old Viewpoint Systems `DIO64` card to the new FPGA-SoC control system, I provide here a Windows dynamic-link-library (DLL) with the same functions as the DLL of the original Viewpoint Systems driver. By just replacing the old DLL with the new one, any software used to control the old system will be able to control the new FPGA-SoC system with only minor changes. Reverting back to the original control system can be done by switching back to the original DLL.
+
+As control software we historically use in our laboratories Labview or Labwindows/CVI from National Instruments, but the described exchange of the DLL works for any other software as well. 
 
 > [!TIP]
 > For a fresh install of your control system, the old driver does not need to be installed. Just place the 64bit DLL into "C:/Windows/System32". 
 
-Here you find the compiled DLL for [32bit Windows](/Windows-DLL/Windows-DLL-x86) and [64bit Windows](/Windows-DLL/Windows-DLL-x64). Since the old DLL was only available for 32bit Windows your old Labview/Labwindows/CVI version must have been also 32bit. I provide 3 files, the dynamic link library (.dll), the static link library (.lib), which is needed by LabWindows/CVI and a command-line executable (.exe) which allows you to test the DLL:
+Here you find the compiled DLL for [32bit Windows](/Windows-DLL/Windows-DLL-x86) and [64bit Windows](/Windows-DLL/Windows-DLL-x64). Since the old DLL was only available for 32bit Windows your old control system version must have been also 32bit, but the new one can be also 64bit. I provide 3 files, the dynamic link library (.dll), the static link library (.lib), and a command-line executable (.exe) which allows you to directly test the DLL and the communication with the FPGA-SoC board:
 
     dio64-32.dll
     dio64-32.lib
     Dlltest.exe
 
-> [!ATTENTION]
+> [!CAUTION]
 > DLLtest.exe can send and execute random data on the board(s)! Do not connect real devices on the board while using this software! Use `DLLtest.exe -h` to get help on how to use this tool.
 
 > [!TIP]
-> Since the new control system does not need a driver, there are no constraints anymore on your control computer hardware, software and operating system! You can upgrade your computer to 64bit Windows, Linux or MAC (not tested). You might also consider of using the open and Python-based control platform [labscript-suite](/labscript-suite) for which I provide the necessary Python files.
+> Since the new control system does not need to install hardware and no driver is needed, there are no constraints anymore on your control computer hardware, software and operating system! You can upgrade your computer to 64bit Windows, Linux or MAC[^1]. You might also consider of using the open and Python-based control platform [labscript-suite](/labscript-suite) for which I provide the necessary Python files.
 
 In the [source](/Windows-DLL/source) folder you find the source files for the DLL and the Visual Studio 2019 project to generate the DLL.
 
@@ -49,4 +51,5 @@ The returned error cluster of `DIO64_OpenResource` needs to be unbundled and whe
 > [!IMPORTANT]
 > Ensure all DIO64_ functions are using the returned board identifier from `DIO64_OpenResource` and call always `DIO64_Close` before exiting your VI even on error!
 
+[^1]: I regularly run the FPGA-SoC system from Ubuntu (with labscript-suite) but I have no Apple MAC computer at hand for testing this option. But I do no see a reason why it should not work. The source files here are heavily Windows-specific such that I do not recommend to modify them to allow compilation also on Unix systems. However, the communciation with the board is quite simple and it should not be much work to make a new Unix style library (.so) or MAC (.dylib). Please let me know if this is needed!
 
