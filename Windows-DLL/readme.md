@@ -47,7 +47,7 @@ For the `resouceName` give a string as for example: `192.168.1.140:49701` with t
 
 Set `board` = 0 and `baseio` = number of boards, i.e. 1 for single board and 2 for primary and secondary board. 
 
-The returned error cluster of `DIO64_OpenResource` needs to be unbundled and when `code` > 0 then there is no error but `code` converted to `U16` is the **board identifier** which needs to be given to all following `DIO64_` functions as `board in`. This ensures that the board can be accessed only from one application at a time. See the figure how to unbundle and to get the board identifier. The error cluster needs then to be reset to the ok state as shown.
+The returned error cluster of `DIO64_OpenResource` needs to be unbundled and when `code` > 0 then there is no error but `code` converted to `U16` is the **board identifier** which needs to be given to all following `DIO64_` functions as `board in`. This ensures that the board can be accessed only from one application at a time. See the image above how to unbundle and to get the board identifier. The error cluster needs then to be reset to the ok state as shown.
 
 3. The other `DIO64_` functions do not need to be modified. Just ensure that the same board identifier is given to all of them and ensure that `DIO64_Close` is called before your VI exits. Otherwise, when you try to start the next time your VI you will not be able to open the board and you will get an error. The software is programmed in such a way that at the second attempt you should be able to open it again. However, ensure to close the board all the time, even if there is an error. Do not use the Labview `Exit` function or the red abort button but always stop your run loop within your VI and properly close the board.
 
@@ -56,6 +56,8 @@ The returned error cluster of `DIO64_OpenResource` needs to be unbundled and whe
 
 > [!IMPORTANT]
 > Ensure all `DIO64_` functions are using the returned board identifier from `DIO64_OpenResource` and call always `DIO64_Close` before exiting your VI even on error!
+
+test [firmware source](/FPGA-firmware/)
 
 [^1]: I regularly run the FPGA-SoC system from Ubuntu (with labscript-suite) but I have no Apple MAC computer at hand for testing. But I do no see a reason why it should not work. The source files here are heavily Windows-specific such that I do not recommend to modify them to allow compilation also on Unix systems. However, the communciation with the board is quite simple and it should not be much work to make a new library (.so or .dylib). Please let me know if this would be appreciated!
 [^2]: We use only static IP's in the local network of each laboratory. If you need to dynamically allocate the IP via DHCP let me know, or modify `FPGA-init` in the [firmware source](/FPGA-firmware/) and recompile it with Petalinux.
