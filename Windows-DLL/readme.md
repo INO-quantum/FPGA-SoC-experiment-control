@@ -23,15 +23,15 @@ In the [source](/Windows-DLL/source) folder you find the source files for the DL
 
 ## Replacing the DLL
 
-To replace the DLL you have to "hide" the original DLL from Labview by moving it into a different folder outside of the labview project, otherwise Labview will find it again. Do not delete it, so you can revert the changes if needed. When you start your Labview VI it will start searching for the old DLL, stop it and give the path to the new DLL. The old DLL is either located in one of your Labview constrol system folders or, when properly installed, in one of the Windows folders "C:/Windows/System32" or "C:/Windows/SysWOW64".
+To replace the DLL you have to "hide" the original DLL from Labview by moving it into a different folder outside of the labview project, otherwise Labview will find it again. Do not delete it, so you can revert the changes if needed. When you start your Labview VI ('Virtual Instrument) it will start searching for the old DLL, stop it and give the path to the new DLL. The old DLL is either located in one of your Labview constrol system folders or, when properly installed, in one of the Windows folders "C:/Windows/System32" or "C:/Windows/SysWOW64".
 
 The library (.lib) is used for static linking and is needed only with Labwindows/CVI. It might be located in "C:/Program Files (x86)/ViewpointSystems/DIO64/Visual C/". You have to manually select the new library and recompile the project. 
 
 ## Updating of Labview
 
-After the DLL is replaced you will need to make a few changes on the old Labview program. Similar changes need to be done on Labwindows/CVI or any other control software.
+After the DLL is replaced you will need to make a few changes on the old Labview VI. Similar changes need to be done on Labwindows/CVI or any other control software.
 
-1. first check that all `DIO64_` function VI's ('Virtual Instrument's) use the new DLL by double-clicking, open Block Diagram, and double-clicking on the "Call Library Function Node", where you should find in the "Function" tab the path to the new DLL. 
+1. first check that all `DIO64_` function VI's  use the new DLL by double-clicking, open Block Diagram, and double-clicking on the "Call Library Function Node", where you should find in the "Function" tab the path to the new DLL. 
 
 2. depending on how antique your old driver is, either `DIO64_Open` or `DIO64_OpenResource` function is used to open the device. Use `DIO64_OpenResource` since it allows to select the IP address of the board. See the image below how to implement this properly. I have placed this into a case structure which allows to faster switch between using the old function call (case 1) and the new (case 2).
 
@@ -58,5 +58,7 @@ The returned error cluster of `DIO64_OpenResource` needs to be unbundled and whe
 > Ensure all `DIO64_` functions are using the returned board identifier from `DIO64_OpenResource` and call always `DIO64_Close` before exiting your VI even on error!
 
 [^1]: I regularly run the FPGA-SoC system from Ubuntu (with labscript-suite) but I have no Apple MAC computer at hand for testing. But I do no see a reason why it should not work. The source files here are heavily Windows-specific such that I do not recommend to modify them to allow compilation also on Unix systems. However, the communciation with the board is quite simple and it should not be much work to make a new library (.so or .dylib). Please let me know if this would be appreciated!
-[^2]: We use only static IP's in the local networks of each laboratory. If you need to dynamically allocate the IP via DHCP let me know, or modify `FPGA-init` in the [firmware source](/FPGA-firmware) and recompile it with Petalinux.
+[^2]: We use only static IP's in the local network of each laboratory. If you need to dynamically allocate the IP via DHCP let me know, or modify `FPGA-init` in the [firmware source](/FPGA-firmware/) and recompile it with Petalinux.
+
+
 
