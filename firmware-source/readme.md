@@ -9,20 +9,21 @@ These software tools are very heavy and not easy to use and Vivado randomly cras
 
 If you are looking for ready-to-use firmware files please have a look at the [firmware-release folder](/firmware-release), select the folder corresponding to your FPGA-SoC board and the version of your buffer card and choose primary or secondary board.
 
-## Hardware implementation:
+## Hardware implementation
 
-The Hardware logic is generated with Vivado 2020.1 from Xilinx running on Ubuntu 20.04 LTS (Vivado is available also for Windows). Vivado WebPACK can be downloaded for free and supports the Zynq 7000 series SoC devices from Xilinx which are used in this project. For instructions on how to install Vivado 2020.1 [see UG973 from Xilinx](https://docs.xilinx.com/v/u/2020.1-English/ug973-vivado-release-notes-install-license). See also the very good [tutorial from Digilent](https://digilent.com/reference/programmable-logic/guides/installing-vivado-and-vitis). For this project Vitis is not needed but for debugging it can be useful and if you want to test `baremetal` projects you will need it. During the installation ensure support for the Zynq-7000 series is enabled. I have tested the Windows and Linux versions and have not seen a big difference. Officially, Ubuntu 18.04 LTS is required but installation on 20.04 LTS is working.
+The Hardware logic is generated with Vivado 2020.1 from Xilinx running on Windows or Ubuntu (I use Ubuntu 20.04 LTS). Vivado WebPACK can be downloaded for free and supports the Zynq 7000 series SoC devices from Xilinx which are used in this project. For instructions on how to install Vivado 2020.1 [see UG973 from Xilinx](https://docs.xilinx.com/v/u/2020.1-English/ug973-vivado-release-notes-install-license). See also the very good [tutorial from Digilent](https://digilent.com/reference/programmable-logic/guides/installing-vivado-and-vitis). For this project Vitis is not needed but for debugging it can be useful and if you want to test `baremetal` projects you will need it. During the installation ensure support for the Zynq-7000 series is enabled. I have tested Vivado on Windows and Linux and have not seen a big difference. For Vivado 2020.1, officially Ubuntu 18.04 LTS (or Windows) is required but installation on 20.04 LTS is working.
 
-<!--check my notes!-->
+> [!NOTE]
+> Note that this project uses Petalinx 2020.1 which requires a Linux operating system. So even if Vivado is available on Windows you will need some Linux distribution to (cross-)compile this project.
 
-On Windows you should have a shortcut on the desctop or enter `vivado` in the search box of the task bar. On Ubuntu you need to launch Vivado from the terminal like this:
+On Windows you should have a shortcut on the desctop or enter `vivado` in the search box of the task bar. On Linux you need to launch Vivado from the terminal like this:
 
     cd <working folder>
     source /opt/Xilinx/Vivado/2020.1/settings64.sh
     export LC_ALL=C
     vivado
     
-This assumes Vivado was installed in the standard location[^1]. Do not execute `vivado` in your home folder since it will contaminate it with temporary files. It is best to create a `work` folder for this purpose. The important `export` command you can also add to `settings64.sh`, so you do not forget it. The `cd` command I do not recommend to add to the file since some scripts execute `settings64.sh` automatically and will end up in an unexpected folder. 
+This assumes Vivado was installed in the standard location[^1]. Do not execute `vivado` in your home folder since it will contaminate it with temporary files. It is best to create a `work` folder for this purpose. The `export` command you can also add to `settings64.sh`, so you do not forget it. The `cd` command I do not recommend to add to the file since some scripts execute `settings64.sh` automatically and will end up in an unexpected folder. 
 
 [^1]: I prefer to install Vivado in the home directory `~/Xilinx/Vivado/`.
 
@@ -32,38 +33,47 @@ This assumes Vivado was installed in the standard location[^1]. Do not execute `
 After Vivado is installed you need to download and copy the [board files from Digilent](https://reference.digilentinc.com/vivado/installing-vivado/start#installing_digilent_board_files).
 
 
-### Generate the Vivado project:
+### Generate the Vivado project
 
 This describes how to generate the .xsa file which Petalinux needs as a payload for the bootloader and to define the linux device tree. You find already generated .xsa files in the [xsa file folder](/firmware-source/2020.1/Vivado/xsa/) for your board.
 
-1. copy the [content of the folder](/firmware-source/2020.1/Vivado/source/) to the location where you want the project to be created
-2. open Vivado (or close any open project) and on the bottom in the `Tcl Console` execute the following commands selecting the tcl script file according to your FPGA board (xx = `10` or `07S`), the buffer board (yy = `v1.2`, `v1.3` or `v1.4`), and zzzz is the release date of the firmware (select the latest for your board):
-        
-      cd <path to copied folder>
-      source ./ExpCtrl_Cora-Z7-xx_yy_zzzz.tcl
+1. copy the [source file folder with the tcl script](/firmware-source/2020.1/Vivado/source/) to the location where you want the project to be created
 
-3. wait until the ExpCtrl_Cora-Z7-xx_yy_zzzz project is created. Vivado asks to select the top module: you can let it do it automatically, or select `design_1_wrapper.v` manually. Check on the bottom that in `Tcl Console` there are no red entries. You can `Open Block Design` to get a graphical representation of the design blocks, the used I/O ports and the connections.
-4. on the bottom of `Flow Navigator` select `Program and Debug` and click `Generate Bitstream`. This will generate the .bit file and the (device tree) information to describe the hardware logic and which devices are used. This takes some time (8'30s on my laptop) and you can check that in the `Messages` tab on the bottom there are no `Critical Warnings`. There will be about 190 `Warnings` which can be ignored in this case - but not always!
-5. after the generation is finished Vivado is asking to `Open the Implemented Design` which you can `Abort` or click `Open` in case you want to see the utilized regions of the FPGA. It's quite packed! We use 67.8% of the lookup tables (logic units), 52.6% of the flip flops (single-bit memory) and 76% of the block RAM. When the chip utilization gets too high the generation can take much longer since Vivado has to find routes for all signals and place cells without having many options to choose from. In this case it will be very difficult for Vivado to fulfill the timing constraints. The result you can see in the `Design Runs` tab on the bottom and where there should nothing be red. The most critical is WNS (worst negative slack) which should be positive and is usually around 1.8ns. All other times should be close to 0. In case of timing problems you can check in the `Implemented Design` which routes failed. It is 
+2. open Vivado (or close any open project) and on the bottom in the `Tcl Console` execute the following commands selecting the tcl script file according to your FPGA board (xx = `10` or `07S`), the buffer board (yy = `v1.2`, `v1.3` or `v1.4`), and zzzz is the release date of the firmware (select the latest for your board):
+
+    cd <path to copied folder>
+    source ./ExpCtrl_Cora-Z7-xx_yy_zzzz.tcl
+
+
+3. wait until the new project is created in the folder. Vivado asks to select the top module: you can let it do it automatically, or select `design_1_wrapper.v` manually. Check on the bottom that in the `Tcl Console` there are no red entries. You can `Open Block Design` to get a graphical representation of the design blocks, the used I/O ports and the connections.
+
+4. on the bottom of `Flow Navigator` select `Program and Debug` and click `Generate Bitstream`. This will generate the .bit file to describe the hardware logic and the Linux device information. This takes some time (8'30s on my laptop) and after it fhished you can check that in the `Messages` tab on the bottom there are no Critical Warnings. There will be about 190 Warnings which can be ignored in this case - but not always!
+
+5. after the generation is finished Vivado is asking to `Open the Implemented Design` which you can `Abort` or click `Open` in case you want to see the utilized regions of the FPGA. It's quite packed! We use 67.8% of the lookup tables (logic units), 52.6% of the flip flops (single-bit memory) and 76% of the block RAM. When the chip utilization gets too high the generation can take much longer since Vivado has to find routes for all signals and place cells without having many options to choose from. In this case it will be very difficult for Vivado to fulfill the timing constraints. The timing result you can see in the `Design Runs` tab on the bottom where nothing should be red: the most critical is WNS (worst negative slack) which should be positive and is usually around 1.8ns. All other times should be close to 0. In case of timing problems you can check in the `Implemented Design` which routes failed. 
+
 6. if all is ok, select `File` - `Export` - `Export Hardware` and leave the selection `Fixed` and click on `Next`, then change the selection to `Include Bitstream` and click `Next`, leave everything on default and click `Next` and `Finish`
+
 7. after a few seconds Vivado has exported the file `design_1_wrapper.xsa` into the project folder. This is the file we need to give to Petalinux in the next step. I usually rename it to match the project name.
+
 8. we are finished and can close Vivado
 
 > [!NOTE]
 > I could simplify the steps for creating the project with respect to the first release of this project with Vivado 2017.4. There I have "packaged" the main IP (dio24.v) which not only made the compilation steps more complicated but caused Vivado to crash randomly (on Windows and on Ubuntu) and several times messed up the entire project rendering it unusable. Now I include the IP as RTL module (in Block Diagram context menu `Add Module` instead of `Add IP`) which makes the definition of interfaces less controllable but is easier to maintain and so far Vivado (2020.1) crashed only once.
   
-### Modify the Vivado project: 
+### Modify the Vivado project
 
-In the open project click `Open Block Design`. Here you can add existing IP blocks and customize blocks by double-clicking them and rearrange the connections. Most likely you want to modify the [verilog files](/firmware-source/Vivado/source). You can open them from the `Sources` tab or with an external text editor. Vivado will recognize when a source has changed. If you want to add new files you have to add them into the `Sources` tab, otherwise Vivado will not find them (same with constraints .xdc files). To regenerate the design click on `Generate Bitstream`. Check that the timing (WNS and others) are not red and that in the `Messages` tab there are no Critical Warnings or Errors. Normal Warnings can be often ignored but one still has to check them since they can be an indicator of problems. When you are finished click `File` - `Export` - `Export Hardware` to export the .xsa file as described in the section before. 
+In the open project click `Open Block Design`. Here you can add existing IP blocks, rearrange connections and customize blocks by double-clicking them. Most likely, you want to modify the [Verilog files directly](/firmware-source/Vivado/source). You can open them from the `Sources` tab or with an external text editor. Vivado will recognize when a source has changed. If you want to add new files you have to add them in the `Sources` tab, otherwise Vivado will not find them. To regenerate the design click on `Generate Bitstream`. Check that the timing (WNS and others) are not red and that in the `Messages` tab there are no Critical Warnings or Errors. Normal Warnings can be often ignored but one still has to check them since they can be an indicator of problems. When you are finished click `File` - `Export` - `Export Hardware` to export the .xsa file as described in the section before. 
 
-## Software implementation:
+If you want to generate the firmware for another buffer board, you have to enable the corresponding .xdc file in the `Sources` tab, constraints section. The project contains the constraints files (port layout and timing) for all three buffer board versions. You will find two of the files gray, i.e. disabled. Right-click the file for the board you want to enable and select `Enable File` and ensure to `Disable File` the previously enabled file. To switch from board version v1.2 to v1.3 or vice versa you can immediately regenerate the .xsa file. To switch to or from v1.4 you need to setup or remove the differential clock input in the Clock Wizard "clk_wiz_0": double-click on the IP block and select "Clocking Options" and on the right bottom (you might to horizontally scroll) you can choose between "Differential clock capable pin" and "Single ended clock capable pin" needed for board version v1.4 and v1.2/v1.3 respectively. After you have changed this check that "Input Frequency (MHz)" is still set to 10.0, i.e. 10MHz and click "OK". For board version v1.2/v1.3 select "clk_in_1" and right-click and select "Make External" and delte the the two ports "clk_in1_n_0" and "clk_in1_p_0". For board version v1.4 click the "+" symbol near CLK_IN1_D port and select only one of the two pins and select "Make External". The same for the other pin. Delete the remaining clk_in1_0 port from the previous design. Now you can regenerate the .xsa file. If it fast gives an error look in the `Messages` tab what is the reason. Most likely the name of one of the ports is wrong. Open the selected constraint .xdc file and search for clk_in or similar and give the ports on the Block Diagram the same name (it must match exactly) as in the xdc (or vice versa). 
+
+## Software implementation
 
 > [!NOTE]
 > I am in the process of updating this page. The information below is not anymore up-to-date ...
 
 Petalinux is a simple Linux distribution which allows you to run an embedded Linux operating system on the CPU. The original board support package (bsp) I used for this project is from Digilent (see https://reference.digilentinc.com/reference/software/petalinux/start) and requires Petalinux 2017.4, which needs to be installed on Ubuntu or a few other Linux OS. Please follow this guide to install Petalinux: https://github.com/Digilent/Petalinux-Cora-Z7-10. The guide uses the recommended installation folder /opt/pkg/petalinux.
 
-### Generate Project:
+### Generate Project
 
 We are still following the guide from before, but instead of using the Digilent bsp (which was the original bsp of my project), we use our project bsp (Petalinux-Cora-Z7-yy-20xx.x-0.bsp for your board with yy="10" or "07S") which you copy onto your computer, open a console and cd to a folder where you want the project to be located and create the project:
 
@@ -71,7 +81,7 @@ We are still following the guide from before, but instead of using the Digilent 
     source path-to-petalinux-installation-folder/settings.sh
     petalinux-create -t project -s path/Petalinux-Cora-Z7-yy-20xx.x-x.bsp
 
-### Using the pre-built images:
+### Using the pre-built images
 
 In the sub-folder "pre-built" of the project you find the prebuilt images with which you can immediately run the board. 
 - copy the files BOOT.BIN (bootloader), image.ub (Linux image), uEnv.txt (Ethernet MAC address) and server.config (server IP address) on a micro-SD card. 
@@ -92,7 +102,7 @@ In case of problems:
 - if the yellow LED is not on, then the bitstream was not written. either the SD card is not properly inserted or the bitstream is corrupt or for a different board. check that the SD card is properly inserted: remove and insert again. check that the sticker on the FPGA-SoC chip reads "10" for the Cora-Z7-10 board or "7S" for the Cora-Z7-07S board. Choose the proper images for the board. try to copy the images again or try a different micro SD card.
 - sometimes the board boots accidently into the "Zynq>" console or you have entered something on the terminal during boot. Enter: "boot" or push the SRST button and the board should boot again.
 
-### Compiling the Petalinux project:
+### Compiling the Petalinux project
 
 1. For compiling the Petalinux project cd into project folder and source petalinux if not already done:
 
@@ -142,7 +152,7 @@ Sometimes building will fail when configuring of the fsbl (first stage bootloade
 Copy image.ub and BOOT.BIN from the /images/linux folder (not the pre-built folder) to the micro-SD card, ensure the server.config file with the proper IP address is as well on the SD card and if you have set the MAC address in petalinux-config you can remove the uEnv.txt file from the SD card.
 
 
-### Using Petalinux:
+### Using Petalinux
 
 These are the first steps if you want to add new functionality.
 
