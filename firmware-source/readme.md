@@ -7,11 +7,11 @@ This folder contains the source files needed for building the firmware for the C
 
 These software tools are very heavy and not easy to use. First time compilation for each of the tools can take easily 10-15 minutes and for Petalinux several additional resources need to be downloaded from the internet. After the first successful compilation the compile time is reduced but at least 5 minutes per iteration makes debugging still very tedious.
 
-If you are looking for ready-to-use firmware files please have a look at the [firmware-release folder](/firmware-release), select the folder corresponding to your FPGA-SoC board and the version of your buffer card and choose primary or secondary board.
+Ready-to-use firmware files can be found in the [firmware-release folder](/firmware-release), select the folder corresponding to your FPGA-SoC board and the version of your buffer card and choose primary or secondary board.
 
 ## Hardware implementation
 
-The Hardware logic is generated with Vivado 2020.1 from Xilinx running on Windows or Ubuntu[^1]. Vivado WebPACK can be downloaded for free and supports the Zynq 7000 series SoC devices from Xilinx which are used in this project. For instructions on how to install Vivado 2020.1 [see UG973 from Xilinx](https://docs.xilinx.com/v/u/2020.1-English/ug973-vivado-release-notes-install-license). See also the very good [tutorial from Digilent](https://digilent.com/reference/programmable-logic/guides/installing-vivado-and-vitis). For this project Vitis is not needed but for debugging it can be useful. During the installation ensure support for the Zynq-7000 series is enabled since we will need this. I have tested Vivado on Windows and Linux and have not seen a big difference.
+The Hardware logic is generated with Vivado 2020.1 from Xilinx running on Windows or Ubuntu[^1]. Vivado WebPACK can be downloaded for free and supports the Zynq 7000 series SoC devices from Xilinx which are used in this project. For instructions on how to install Vivado 2020.1 [see UG973 from Xilinx](https://docs.xilinx.com/v/u/2020.1-English/ug973-vivado-release-notes-install-license). See also the very good [tutorial from Digilent](https://digilent.com/reference/programmable-logic/guides/installing-vivado-and-vitis). For this project Vitis is not needed but for debugging it can be useful. During the installation ensure that support for the Zynq-7000 series devices is enabled since we will need this. I have tested Vivado on Windows and Linux and have not seen a big difference.
 
 [^1]: For Vivado 2020.1, Ubuntu 18.04 LTS is supported but not Ubuntu 20.04 LTS, however, I use the latter without big problems.
 
@@ -27,25 +27,26 @@ On Windows you should have a shortcut on the desctop or enter `vivado` in the se
     
 This assumes Vivado was installed in the standard location[^2]. Do not execute `vivado` in your home folder since it will contaminate it with temporary files. It is best to create a `work` folder for this purpose. The `export` command you can also add to `settings64.sh`, so you do not forget it. The `cd` command I do not recommend to add to the file since some scripts execute `settings64.sh` automatically and will end up in an unexpected folder. 
 
-[^2]: I prefer to install Vivado in the home directory `~/Xilinx/Vivado/` since this does not needs `sudo` privilegs.
+[^2]: I prefer to install Vivado in the home directory `~/Xilinx/Vivado/` since this does not need `sudo` privilege.
 
 > [!Note]
 > By manually selecting the location of `settings64.sh` you can easily switch between different versions of Vivado. This might be needed since projects generated with one version usually make troubles when trying to use with another version.
 
-After Vivado is installed you need to download and copy the [board files from Digilent](https://reference.digilentinc.com/vivado/installing-vivado/start#installing_digilent_board_files).
+After Vivado is installed you need to download and copy the [board files from Digilent](https://reference.digilentinc.com/vivado/installing-vivado/start#installing_digilent_board_files). Choose the Cora-Z7-07S or Cora-Z7-10 board, depending on which you have.
 
 
 ### Generate the Vivado project
 
-This describes how to generate the .xsa file which Petalinux needs and contains the .bit payload file for the bootloader and the linux device tree definition. You find already generated .xsa files in the [xsa file folder](/firmware-source/2020.1/Vivado/xsa/) for your board.
+This describes how to generate the .xsa file which Petalinux needs and contains the .bit file with the logic definition of the FPGA and the linux device tree. You find already generated .xsa files in the [xsa file folder](/firmware-source/2020.1/Vivado/xsa/) for your board.
 
 1. copy the content of the [source file folder including the tcl script](/firmware-source/2020.1/Vivado/source/) to the location where you want the project to be created
 
 2. open Vivado (or close any open project) and on the bottom in the `Tcl Console` execute the following commands selecting the tcl script file according to your FPGA board (xx = `10` or `07S`), the buffer board (yy = `v1.2`, `v1.3` or `v1.4`), and zzzz is the release date of the firmware (select the latest for your board):
 
+    
     cd <path to copied folder>
     source ./ExpCtrl_Cora-Z7-xx_yy_zzzz.tcl
-
+    
 
 3. wait until the new project is created in the folder. Vivado asks to select the top module: you can let it do it automatically, or select `design_1_wrapper.v` manually. Check on the bottom that in the `Tcl Console` there are no red entries. You can `Open Block Design` to get a graphical representation of the design blocks, the used I/O ports and the connections.
 
