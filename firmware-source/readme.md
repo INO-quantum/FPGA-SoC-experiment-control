@@ -74,8 +74,9 @@ If you want to generate the firmware for another buffer board, you have to enabl
  
 * For the new board version v1.4 click the `+` symbol near the `CLK_IN1_D` port (vertical two lines `||`) and select one of the two pins and `Make External`. Do the same for the other pin. Delete the remaining `clk_in1_0` port from the previous design.
 
-3. Now you can regenerate the .xsa file as described above. If it gives an error look in the `Messages` tab what is the reason. Most likely the name of one of the ports is wrong. Open the selected constraint .xdc file and search for `clk_in` and give the ports on the Block Diagram the exact same name as in the .xdc (or vice versa). The port name can be changed by double-clicking on the port or changing the `Name` entry in `External Port Properties`. 
+3. This step is optional but when you change the buffer board version you should also change content of the `info` register content: In the Block Design double-click on the `dio24_0` module and scroll down to the `Version` entry. This is a hexadecimal number where the upper four digits represent the board version: `0x0102` is v1.2, `0x0103` is v1.3 and `0x0104` is v1.4. Change this entry accordingly leaving the remaining 4 digits as they were - they represent the date of the firmware. Click "OK" when finished.
 
+4. Now you can regenerate the .xsa file as described above. If it gives an error look in the `Messages` tab what is the reason. Most likely the name of one of the ports is wrong. Open the selected constraint .xdc file and search for `clk_in` and give the ports on the Block Diagram the exact same name as in the .xdc (or vice versa). The port name can be changed by changing the `Name` entry in `External Port Properties`. 
 
 ## Software implementation
 
