@@ -43,10 +43,11 @@ This describes how to generate the .xsa file which Petalinux needs and contains 
 
 2. open Vivado (or close any open project) and on the bottom in the `Tcl Console` execute the following commands selecting the tcl script file according to your FPGA board (xx = `10` or `07S`), the buffer board (yy = `v1.2`, `v1.3` or `v1.4`), and zzzz is the release date of the firmware (select the latest for your board):
 
-    
+```    
     cd <path to copied folder>
     source ./ExpCtrl_Cora-Z7-xx_yy_zzzz.tcl
     
+```
 
 3. wait until the new project is created in the folder. Vivado asks to select the top module: you can let it do it automatically, or select `design_1_wrapper.v` manually. Check on the bottom that in the `Tcl Console` there are no red entries. You can `Open Block Design` to get a graphical representation of the design blocks, the used I/O ports and the connections.
 
