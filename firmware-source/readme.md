@@ -32,62 +32,36 @@ This assumes Vivado was installed in the standard location[^1]. Do not execute `
 After Vivado is installed you need to download and copy the [board files from Digilent](https://reference.digilentinc.com/vivado/installing-vivado/start#installing_digilent_board_files).
 
 
-> [!NOTE]
-> I am in the process of updating this page. The information below is not anymore up-to-date ...
-
-
 ### Generate the Vivado project:
 
-- copy the content of the sub-folder Vivado_2017.4/release_202x.x-x (take the latest) into the folder where you want the project to be located
-- open Vivado and on the bottom "Tcl console" type: (tested on ubuntu 18.04 LTS, should be similar on other OS)
+This describes how to generate the .xsa file which Petalinux needs as a payload for the bootloader and to define the linux device tree. You find already generated .xsa files in the [xsa file folder](/firmware-source/2020.1/Vivado/xsa/) for your board.
+
+1. copy the [content of the folder](/firmware-source/2020.1/Vivado/source/) to the location where you want the project to be created
+2. open Vivado (or close any open project) and on the bottom in the `Tcl Console` execute the following commands selecting the tcl script file according to your FPGA board (xx = `10` or `07S`), the buffer board (yy = `v1.2`, `v1.3` or `v1.4`), and zzzz is the release date of the firmware (select the latest for your board):
         
-      cd /home/path to your folder with tcl scripts
-      source ./ExpCtrl_dio24_project_script.tcl
+      cd <path to copied folder>
+      source ./ExpCtrl_Cora-Z7-xx_yy_zzzz.tcl
 
-- wait until the dio24 project is created. check that a new folder dio24 was created in the script folder.
-- do not close the project but type in the "Tcl console" on the bottom:
-    
-      source ./ExpCtrl_dio24_package_script.tcl
-       
-- this will open the IP packager to package the dio24 project into a custom IP in the sub-folder /ip_repo/dio24/. this is the custom module which we use for the project. The Verilog source is in the /hdl folder. wait until the packager has closed and you are back in the dio24 project. 
-- check if there are errors in the Tcl console.
-- check that in the "IP Catalog" (in the Project Manager on the left) there is now a new entry "User Repository" - "UserIP" - "dio24_v1_0". Otherwise, click in Project Manager on "Settings" - "IP" - "Repository". remove any red repository there (select and click the "-") and click "+" and select the new /ip_repo folder.
-- close the project
-- now you can create the main project for the Cora-Z7-10 or Cora-Z7-07S board (or both) and type again in the "Tcl console" of Vivado for either board:
+3. wait until the ExpCtrl_Cora-Z7-xx_yy_zzzz project is created. Vivado asks to select the top module: you can let it do it automatically, or select `design_1_wrapper.v` manually. Check on the bottom that in `Tcl Console` there are no red entries. You can `Open Block Design` to get a graphical representation of the design blocks, the used I/O ports and the connections.
+4. on the bottom of `Flow Navigator` select `Program and Debug` and click `Generate Bitstream`. This will generate the .bit file and the (device tree) information to describe the hardware logic and which devices are used. This takes some time (8'30s on my laptop) and you can check that in the `Messages` tab on the bottom there are no `Critical Warnings`. There will be about 190 `Warnings` which can be ignored in this case - but not always!
+5. after the generation is finished Vivado is asking to `Open the Implemented Design` which you can `Abort` or click `Open` in case you want to see the utilized regions of the FPGA. It's quite packed! We use 67.8% of the lookup tables (logic units), 52.6% of the flip flops (single-bit memory) and 76% of the block RAM. When the chip utilization gets too high the generation can take much longer since Vivado has to find routes for all signals and place cells without having many options to choose from. In this case it will be very difficult for Vivado to fulfill the timing constraints. The result you can see in the `Design Runs` tab on the bottom and where there should nothing be red. The most critical is WNS (worst negative slack) which should be positive and is usually around 1.8ns. All other times should be close to 0. In case of timing problems you can check in the `Implemented Design` which routes failed. It is 
+6. if all is ok, select `File` - `Export` - `Export Hardware` and leave the selection `Fixed` and click on `Next`, then change the selection to `Include Bitstream` and click `Next`, leave everything on default and click `Next` and `Finish`
+7. after a few seconds Vivado has exported the file `design_1_wrapper.xsa` into the project folder. This is the file we need to give to Petalinux in the next step. I usually rename it to match the project name.
+8. we are finished and can close Vivado
 
-      source ./ExpCtrl_Cora_Z7_10_project_script.tcl
-      source ./ExpCtrl_Cora_Z7_07S_project_script.tcl
-      
-- this will create the main project in a new sub-folder "Cora-Z7-10" or "Cora-Z7-07S". The last output on the console should read "INFO: Project created:Cora-Z7-xx" with xx="10" or "07S" depending on the board. There will be 12 critical warnings which can be ignored. Four of them are: "PCW_UIPARAM_DDR_DQS_TO_CLK_DELAY_* has negative value...". They are about DDR timings. See here (for a different board): https://github.com/Digilent/SDSoC-Zybo-Z7-20
-- in the Project Manager - IP Integrator "Open Block Design" and press the Round-Circle-Arrow symbol to regenerate the Layout. You should see something similar as in the screenshot file in the script folder.
-- click the Square-Check-Mark symbol to validate design: you should get only the 4 Critical Warnings from above.
-  - click in Project Manager "Program and Debug" - "Generate Bitstream"
-  - this will generate the bitstream which will be uploaded on the FPGA. Depending on your computer this can take several minutes (the first time). On mine it takes 10 Minutes. You can observe the progress in the "Design Run" Tab on the Bottom.
-- When Vivado is finished it will ask you to "Open Implemented Design" which you can "cancel" or click "ok" to see the placement on the chip and other information.
-- click File - Export - Export Hardware - ensure "Include Bitstream" is selected and click ok. This saves the file design_1_warpper.hdf in your project directory/project_name.sdk folder. You will need to copy this file into the Petalinux project folder since the hdf contains not only the "bit stream" but also information about the "device tree" used by Petalinux (see below).
+> [!NOTE]
+> I could simplify the steps for creating the project with respect to the first release of this project with Vivado 2017.4. There I have "packaged" the main IP (dio24.v) which not only made the compilation steps more complicated but caused Vivado to crash randomly (on Windows and on Ubuntu) and several times messed up the entire project rendering it unusable. Now I include the IP as RTL module (in Block Diagram context menu `Add Module` instead of `Add IP`) which makes the definition of interfaces less controllable but is easier to maintain and so far Vivado (2020.1) crashed only once.
   
-### Modify the project: 
-- in the Block design right-click on the dio24 module block and select "Edit in IP-packager". 
-- In the packager you can modify the source Verilog files. 
-- After Modification ensure that in the "Package IP" tab all items have a green checkmark, otherwise click the item and on the top "Merge changes...". 
-- On the last entry on the bottom click "Re-package IP". 
-- After this you have to "Upgrade IP". Usually, you will get a notification that this has to be done, otherwise select "Tools" - "Reports" - "Report IP Status". and a new pane opens on the bottom. if there is a blue "Rerun" text, click on it to run it again and it will tell you which module needs to be upgraded. Click on the bottom on "Upgrade Selected". 
-- It will ask to "Regenerate Output Products" which you can click "OK" or "Cancel" and go to next point immediately (which will generate output products if not done). 
-- Generate Bitstream
-- Watch out the "Messages" window on the bottom. There are many warnings (1331 for first run of tcl) but most can be ignored. However, if something does not work, you will most likely find hints there. Critical Warnings should not be ignored except a few standard ones (like the 4 PCW_UIPARAM_DDR_DQS_TO_CLK_DELAY_ from above or when the upgrading has detected port changes). Note that Vivado 2017.4 still displays old messages (especially errors) even when you have fixed them (not the case anymore in 2018 versions). 
+### Modify the Vivado project: 
 
-### In case of troubles:
-Unfortunately, Vivado on Ubuntu 18.04 LTS tends to crash frequently during the execution of the tcl scripts and rarely otherwise
-- before packaging of the IP (the second script mentioned above), ensure, that in "Settings" - "IP" - "Repository" there is no red entry, otherwise remove it. If a project entry is there, remove it as well. 
-- all crashes happen randomly, often immediately or a few seconds after tcl script, IP packager or generating output products started. just retry and most likely it will work the next time.
-- ensure that Ubuntu is not using Wayland but Xorg as display server in Ubuntu. Ensure your Os is up-to-date. avoid clicking anything during execution of the tcl script. maybe move the mouse outside of the Vivado window. For Vivado there is a known bug from 2016-2018 versions (maybe even 2020?), but nothing has helped for me. However, it crashes only rarely and 2017 is maybe more stable than 2018 (there the SDK was unusable, but is not needed here).
-- wait until all background activity of Vivado has stopped or close and re-open before going to the next step.
-- especially for upgrading an IP on Vivado 2018 it required to close the project and re-open it before upgrading. Maybe "Rerun" the IP status report might also help.
+In the open project click `Open Block Design`. Here you can add existing IP blocks and customize blocks by double-clicking them and rearrange the connections. Most likely you want to modify the [verilog files](/firmware-source/Vivado/source). You can open them from the `Sources` tab or with an external text editor. Vivado will recognize when a source has changed. If you want to add new files you have to add them into the `Sources` tab, otherwise Vivado will not find them (same with constraints .xdc files). To regenerate the design click on `Generate Bitstream`. Check that the timing (WNS and others) are not red and that in the `Messages` tab there are no Critical Warnings or Errors. Normal Warnings can be often ignored but one still has to check them since they can be an indicator of problems. When you are finished click `File` - `Export` - `Export Hardware` to export the .xsa file as described in the section before. 
 
 ## Software implementation:
 
-Petalinux is a simple Linux distribution which allows you to run an embedded Linux operating system on the CPU. The original board support package (bsp) I used for this project is from Digilent (see https://reference.digilentinc.com/reference/software/petalinux/start) and requires Petalinux 2017.4, which needs to be installed on Ubuntu or a few other Linux OS. Please follow this guide to install Petalinux: https://github.com/Digilent/Petalinux-Cora-Z7-10. The guide uses the recommended installation folder /opt/pkg/petalinux.
+> [!NOTE]
+> I am in the process of updating this page. The information below is not anymore up-to-date ...
 
+Petalinux is a simple Linux distribution which allows you to run an embedded Linux operating system on the CPU. The original board support package (bsp) I used for this project is from Digilent (see https://reference.digilentinc.com/reference/software/petalinux/start) and requires Petalinux 2017.4, which needs to be installed on Ubuntu or a few other Linux OS. Please follow this guide to install Petalinux: https://github.com/Digilent/Petalinux-Cora-Z7-10. The guide uses the recommended installation folder /opt/pkg/petalinux.
 
 ### Generate Project:
 
