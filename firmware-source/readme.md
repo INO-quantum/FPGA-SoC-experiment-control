@@ -13,7 +13,7 @@ Ready-to-use firmware files can be found in the [firmware-release folder](/firmw
 
 The Hardware logic is generated with Vivado 2020.1 from Xilinx running on Windows or Ubuntu[^1]. Vivado WebPACK can be downloaded for free and supports the Zynq 7000 series SoC devices from Xilinx which are used in this project. For instructions on how to install Vivado 2020.1 [see UG973 from Xilinx](https://docs.xilinx.com/v/u/2020.1-English/ug973-vivado-release-notes-install-license). See also the very good [tutorial from Digilent](https://digilent.com/reference/programmable-logic/guides/installing-vivado-and-vitis). For this project Vitis is not needed but for debugging it can be useful. During the installation ensure that support for the Zynq-7000 series devices is enabled since we will need this. I have tested Vivado on Windows and Linux and have not seen a big difference.
 
-[^1]: For Vivado 2020.1, Ubuntu 18.04 LTS is supported but not Ubuntu 20.04 LTS, however, I use the latter without big problems.
+[^1]: Vivado and Petalinux 2020.1 officially support Ubuntu 18.04 LTS but I use Ubuntu 20.04 LTS without big problems.
 
 > [!NOTE]
 > Note that this project uses Petalinx 2020.1 which requires a Linux operating system. So even if Vivado is available on Windows you will need some Linux distribution to (cross-)compile this project.
@@ -27,7 +27,7 @@ On Windows you should have a shortcut on the desctop or enter `vivado` in the se
 
 This assumes Vivado was installed in the standard location[^2]. Do not execute `vivado` in your home folder since it will contaminate it with temporary files. It is best to create a `work` folder for this purpose. The `export` command you can also add to `settings64.sh`, so you do not forget it. The `cd` command I do not recommend to add to the file since some scripts execute `settings64.sh` automatically and will end up in an unexpected folder. 
 
-[^2]: I prefer to install Vivado in the home directory `~/Xilinx/Vivado/` since this does not need `sudo` privilege.
+[^2]: I prefer to install Vivado and Petalinux in the home directory `~/Xilinx/Vivado/<version>` and `~/Xilinx/petalinux/<version>`. This way installation does not need `sudo` privilege.
 
 > [!Note]
 > By manually selecting the location of `settings64.sh` you can easily switch between different versions of Vivado. This might be needed since projects generated with one version usually make troubles when trying to use with another version.
@@ -78,12 +78,12 @@ If you want to generate the firmware for another buffer board, you have to enabl
 
 4. Now you can regenerate the .xsa file as described above. If it gives an error look in the `Messages` tab what is the reason. Most likely the name of one of the ports is wrong. Open the selected constraint .xdc file and search for `clk_in` and give the ports on the Block Diagram the exact same name as in the .xdc (or vice versa). The port name can be changed by changing the `Name` entry in `External Port Properties`. 
 
-## Software implementation
-
 > [!NOTE]
 > I am in the process of updating this page. The information below is not anymore up-to-date ...
 
-Petalinux is a simple Linux distribution which allows you to run an embedded Linux operating system on the CPU. The original board support package (bsp) I used for this project is from Digilent (see https://reference.digilentinc.com/reference/software/petalinux/start) and requires Petalinux 2017.4, which needs to be installed on Ubuntu or a few other Linux OS. Please follow this guide to install Petalinux: https://github.com/Digilent/Petalinux-Cora-Z7-10. The guide uses the recommended installation folder /opt/pkg/petalinux.
+## Software implementation
+
+Petalinux is a simple Linux distribution which allows to run an embedded Linux operating system on the CPU. The original board support package (.bsp) and demos are from [Digilent](https://reference.digilentinc.com/reference/software/petalinux/start) and require Petalinux 2017.4 installed on a Linux operating system. The present project works with Vivado and Petalinux 2020.1 on Ubuntu 20.04 LTS[^1]. For the installation of Petalinux 2020.1 please consult the [Petalinux Tools guide from Xilinx](https://docs.xilinx.com/v/u/2020.1-English/ug1144-petalinux-tools-reference-guide). More condensed information (probably not anymore fully up-to-date) can be obtained also from the [Cora-Z7-07S Petalinux BSP Project from Digilent](https://github.com/Digilent/Petalinux-Cora-Z7-07S/blob/master/README.md). The guides use the recommended installation folder /opt/pkg/petalinux[^2].
 
 ### Generate Project
 
@@ -155,7 +155,7 @@ For the first time this will download the linux kernel (if not selected from loc
     WARNING: FPGA-server-1.0-r0 do_package_qa: QA Issue: /usr/bin/FPGA-server contained in package FPGA-server requires libc.so.6(GLIBC_2.4), but no providers found in RDEPENDS_FPGA-server? [file-rdeps]
     WARNING: FPGA-test-1.0-r0 do_package_qa: QA Issue: /usr/bin/FPGA-test contained in package FPGA-test requires libstdc++.so.6(CXXABI_1.3.8), but no providers found in RDEPENDS_FPGA-test? [file-rdeps]
 
-Sometimes building will fail when configuring of the fsbl (first stage bootloader) takes too long. I think it needs to wait until all other sources are compiled. Petalinux gives an error which looks like it was running out of memory, but I believe its rather a timeout during configuring. When you build it a second time it will work without problems since the dependent sources are already compiled and the fsbl should configure and compile immediately. 
+Sometimes building will fail when configuring of the fsbl (first stage bootloader) takes too long. I think it needs to wait until all other sources are compiled. Petalinux gives an error which looks like it was running out of memory, but I believe its rather a timeout during configuring? When you build it a second time it will work without problems since the dependent sources are already compiled and the fsbl should configure and compile immediately. 
 
 6. Package files for booting from SD card:
 
