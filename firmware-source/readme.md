@@ -2,16 +2,16 @@
 
 This folder contains the source files needed for building the firmware for the Cora-Z7 board. The building process can be divided into two main steps: 
 
-1. generate the hardware logic on the FPGA part using Vivado (2020.1)
-2. generate the Linux image and software running on the CPU with Petalinux (2020.1)
+1. Generate the hardware logic on the FPGA part using Vivado (2020.1)
+2. Generate the Linux image and software running on the CPU with Petalinux (2020.1)
 
-These software tools are very heavy and not easy to use. First time compilation for each of the tools can take easily 10-15 minutes and for Petalinux several additional resources need to be downloaded from the internet. After the first successful compilation the compile time is reduced but at least 5 minutes per iteration makes debugging still very tedious.
+The used software tools are heavy, not user-friendly and buggy. First time compilation for each of the tools can take 10-15 minutes and for Petalinux several additional resources need to be downloaded from the internet. After the first successful compilation the compile time is reduced but 5-10 minutes per iteration makes debugging still very tedious.
 
-Ready-to-use firmware files can be found in the [firmware-release folder](/firmware-release), select the folder corresponding to your FPGA-SoC board and the version of your buffer card and choose primary or secondary board.
+Ready-to-use firmware files can be found in the [firmware-release folder](/firmware-release): select the folder corresponding to your FPGA-SoC board and the version of your buffer card and choose primary or secondary board.
 
 ## Hardware implementation
 
-The Hardware logic is generated with Vivado 2020.1 from Xilinx running on Windows or Ubuntu[^1]. Vivado WebPACK can be downloaded for free and supports the Zynq 7000 series SoC devices from Xilinx which are used in this project. For instructions on how to install Vivado 2020.1 [see UG973 from Xilinx](https://docs.xilinx.com/v/u/2020.1-English/ug973-vivado-release-notes-install-license). See also the very good [tutorial from Digilent](https://digilent.com/reference/programmable-logic/guides/installing-vivado-and-vitis). For this project Vitis is not needed but for debugging it can be useful. During the installation ensure that support for the Zynq-7000 series devices is enabled since we will need this. I have tested Vivado on Windows and Linux and have not seen a big difference.
+The Hardware logic is generated with Vivado 2020.1 from Xilinx running on Windows or Ubuntu[^1]. Vivado WebPACK can be downloaded free of charge (after registering) and supports the Zynq-7000 series SoC devices from Xilinx which are used in this project. For instructions on how to install Vivado 2020.1 [see UG973 from Xilinx](https://docs.xilinx.com/v/u/2020.1-English/ug973-vivado-release-notes-install-license). See also the very good [tutorial from Digilent](https://digilent.com/reference/programmable-logic/guides/installing-vivado-and-vitis). The installation file size is huge which is a problem when you need to install several versions of Vivado or running Linux in a virtual environment. For this project `Vitis` is not needed but for debugging it can be useful. During the installation ensure that support for the Zynq-7000 series devices is enabled. I have tested Vivado on Windows and Linux and have not seen a big difference.
 
 [^1]: Vivado and Petalinux 2020.1 officially support Ubuntu 18.04 LTS but I use Ubuntu 20.04 LTS without big problems.
 
@@ -39,23 +39,23 @@ After Vivado is installed you need to download and copy the [board files from Di
 
 This describes how to generate the .xsa file which Petalinux needs and contains the .bit file with the logic definition of the FPGA and the linux device tree. You find already generated .xsa files in the [xsa file folder](/firmware-source/2020.1/Vivado/xsa/) for your board.
 
-1. copy the content of the [source file folder including the tcl script](/firmware-source/2020.1/Vivado/source/) to the location where you want the project to be created
+1. Copy the content of the [source file folder including the tcl script](/firmware-source/2020.1/Vivado/source/) to the location where you want the project to be created
 
-2. open Vivado (or close any open project) and on the bottom in the `Tcl Console` execute the following commands selecting the tcl script file according to your FPGA board (xx = `10` or `07S`), the buffer board (yy = `v1.2`, `v1.3` or `v1.4`), and zzzz is the release date of the firmware (select the latest for your board):
+2. Open Vivado (or close any open project) and on the bottom in the `Tcl Console` execute the following commands selecting the tcl script file according to your FPGA board (xx = `10` or `07S`), the buffer board (yy = `v1.2`, `v1.3` or `v1.4`), and zzzz is the release date of the firmware (select the latest for your board):
 ```
 cd <path to copied folder>
 source ./ExpCtrl_Cora-Z7-xx_yy_zzzz.tcl  
 ```
 
-3. wait until the new project is created in the folder. Vivado asks to select the top module: you can let it do it automatically, or select `design_1_wrapper.v` manually. Check on the bottom that in the `Tcl Console` there are no red entries. You can `Open Block Design` to get a graphical representation of the design blocks, the used I/O ports and the connections.
+3. Wait until the new project is created in the folder. Vivado asks to select the top module: automatic selection should work, or select `design_1_wrapper.v` manually. Check on the bottom that in the `Tcl Console` there are no red entries. You can `Open Block Design` to get a graphical representation of the design blocks, the used I/O ports and the connections.
 
-4. on the bottom of `Flow Navigator` select `Program and Debug` and click `Generate Bitstream`. This will generate the .bit file to describe the hardware logic. This takes some time (8'30s on my laptop) and after it finished you can check that in the `Messages` tab on the bottom there are no Critical Warnings. There will be about 190 Warnings which can be ignored in this case - but not always!
+4. On the bottom of `Flow Navigator` select `Program and Debug` and click `Generate Bitstream`. This will generate the .bit file to describe the hardware logic. The first time this can takes some minutes (8'30s on my laptop) and after it finished you can check that in the `Messages` tab on the bottom there are no Critical Warnings. There will be about 190 Warnings which can be ignored in this case - but not always!
 
-5. after the generation is finished Vivado is asking to `Open the Implemented Design` which you can `Abort` or click `Open` in case you want to see the utilized regions of the FPGA. It's quite packed: the projects use 68% of the lookup tables (logic cells), 53% of the flip flops (single-bit memory) and 76% of the block RAM. When the chip utilization gets too high the generation can take much longer since Vivado has to find routes for all signals and place cells without having many options to choose from. In this case it will be very difficult for Vivado to fulfill the timing constraints. The timing result you can see in the `Design Runs` tab on the bottom where nothing should be red: the most critical is WNS (worst negative slack) which should be positive and is usually around 1.8ns. All other times should be close to 0. In case of timing problems you can check the failed routes in the `Implemented Design`. There is also the `Constraint Wizard` which is sometimes useful to automatically fix unconstraint clock domain crossings which most of the time cause failed routes.
+5. Vivado is asking to `Open the Implemented Design` which you can `Abort` or click `Open` in case you want to see the utilized regions of the FPGA. It's quite packed: the project uses 68% of the lookup tables (logic cells), 53% of the flip flops (single-bit memory) and 76% of the block RAM. When the chip utilization gets too high the generation can take much longer since Vivado has to find routes for all signals and place cells without having many options to choose from. In this case it will be very difficult for Vivado to fulfill the timing constraints. The timing result you can see in the `Design Runs` tab on the bottom where nothing should be red: the most critical is WNS (worst negative slack) which should be positive and is usually around 1.8ns. All other times should be close to 0. In case of timing problems you can check the failed routes in the `Implemented Design`. There is also the `Constraint Wizard` which is sometimes useful to automatically fix unconstraint clock domain crossings which most of the time cause failed routes.
 
-6. if all is ok, select `File` - `Export` - `Export Hardware` and leave the selection `Fixed` and click on `Next`, then change the selection to `Include Bitstream` and click `Next`, leave everything on default and click `Next` and `Finish`
+6. If all is ok, select `File` - `Export` - `Export Hardware` and leave the selection `Fixed` and click on `Next`, then change the selection to `Include Bitstream` and click `Next`, leave everything on default and click `Next` and `Finish`
 
-7. after a few seconds Vivado has exported the file `design_1_wrapper.xsa` into the project folder. This is the file we need to give to Petalinux in the next step. I usually rename it to match the project name. Now you can close the project.
+7. After a few seconds Vivado has exported the file `design_1_wrapper.xsa` into the project folder. This is the file we need to give to Petalinux in the next step. I usually rename it to match the project name. The .xsa files for the different boards you find [here](/firmware-source/2020.1/Vivado/xsa/). Now you can close the project.
 
 > [!NOTE]
 > I could simplify the steps for creating the project with respect to the first release of this project with Vivado 2017.4. There I have "packaged" the main IP (dio24.v) which, apart of complicating the compilation steps, caused also that Vivado crashing randomly (on Windows and on Ubuntu) and several times even messed up the entire project rendering it unusable. Now I include the IP as RTL module (in the Block Diagram context menu select `Add Module` instead of `Add IP`) which makes the definition of interfaces less controllable but is easier to maintain and so far Vivado (2020.1) crashed only once.
@@ -64,17 +64,17 @@ source ./ExpCtrl_Cora-Z7-xx_yy_zzzz.tcl
 
 In the open project click `Open Block Design`. Here you can add existing IP blocks, rearrange connections and customize blocks by double-clicking them. Most likely, you want to modify the [Verilog source files](/firmware-source/Vivado/source). You can open them from the `Sources` tab or with an external text editor. Vivado will recognize when a source has changed. If you want to add new files you have to add them in the `Sources` tab, otherwise Vivado will not find them. To regenerate the design click on `Generate Bitstream`. Check that the timing (WNS and others) are not red and that in the `Messages` tab there are no Critical Warnings or Errors. Normal Warnings can be often ignored but one still has to check them since they can be an indicator of problems. When you are finished click `File` - `Export` - `Export Hardware` to export the .xsa file as described in the section before. 
 
-If you want to generate the firmware for another buffer board, you have to enable the corresponding .xdc file in the `Sources` tab, constraints section, and change differential vs. single-ended clock:
+If you want to generate the firmware for another buffer board, you have to enable the corresponding .xdc file in the `Sources` tab, constraints section, and for/to buffer board version v1.4 you have to change differential/single-ended clock input:
 
-1. The project contains the constraints files (port layout and timing) for all three buffer board versions. You will find two of the files gray, i.e. disabled. Right-click the file for the board you want to enable and select `Enable File` and ensure to `Disable File` the previously enabled file. 
+1. The project contains the constraints files (port layout and timing) for all three buffer board versions. You will find two of the files gray, i.e. disabled. Right-click the file for the board you want to enable and select `Enable File` and for the previously enabled file select `Disable File`. 
 
-2. Buffer board version v1.4 uses a differential input clock while the older version v1.2 and v1.3 use a single-ended clock input. Therefore, to switch from or to board version v1.4 you need to setup or remove the differential clock input. In the Block Design find the Clock Wizard "clk_wiz_0" and double-click on it and select "Clocking Options" and on the right bottom (you might need to scroll horizontally) you can choose between "Differential clock capable pin" (v1.4) and "Single ended clock capable pin" (v1.2 and v1.3). After you have changed this, check that "Input Frequency (MHz)" is still set to 10.0, i.e. 10MHz and click "OK". 
+2. The buffer board version v1.4 uses a differential input clock while the older version v1.2 and v1.3 use a single-ended clock input. Therefore, to switch from or to board version v1.4 you need to setup or remove the differential clock input. In the Block Design find the Clock Wizard "clk_wiz_0" and double-click on it and select "Clocking Options" and on the right bottom (you might need to scroll horizontally) you can choose between "Differential clock capable pin" (v1.4) and "Single ended clock capable pin" (v1.2 and v1.3). After you have changed this, check that "Input Frequency (MHz)" is still set to 10.0, i.e. 10MHz and click "OK". 
 
-* For the new board version v1.2 or v1.3 select `clk_in_1` and right-click and select `Make External` and delete the two ports `clk_in1_n_0` and `clk_in1_p_0`.
+* For the new board version v1.2 or v1.3 select the port `clk_in1` of the Clock Wizard block and right-click and select `Make External`. Delete the two ports `clk_in1_n_0` and `clk_in1_p_0`. Click on the new external input `clk_in1_0` and check that in the `External Port Properties` the frequency is set to 10MHz, otherwise set it to this frequency.
  
-* For the new board version v1.4 click the `+` symbol near the `CLK_IN1_D` port (vertical two lines `||`) and select one of the two pins and `Make External`. Do the same for the other pin. Delete the remaining `clk_in1_0` port from the previous design.
+* For the new board version v1.4 click the `+` symbol near the `CLK_IN1_D` port (vertical two lines `||`) of the Clock Wizard block and select one of the two pins and `Make External`. Do the same for the other pin. Delete the remaining `clk_in1_0` port from the previous design. Click on the new external input `clk_in1_n_0` or `clk_in1_p_0` and check that in the `External Port Properties` the frequency is set to 10MHz, otherwise set it to this frequency.
 
-3. This step is optional but when you change the buffer board version you should also change the content of the `Version` register: In the Block Design double-click on the `dio24_0` module and scroll down to the `Version` entry. This is a hexadecimal number where the upper four digits represent the board version: `0x0102` is v1.2, `0x0103` is v1.3 and `0x0104` is v1.4. Change this entry accordingly leaving the remaining 4 digits as they were - they represent the date of the firmware. Click "OK" when finished.
+3. This step is optional but when you change the buffer board version you should also change the content of the `Version` register: In the Block Design double-click on the `dio24_0` module and scroll down to the `Version` entry. This is a hexadecimal number where the first four digits represent the board version: `0x0102` is v1.2, `0x0103` is v1.3 and `0x0104` is v1.4. Change this entry accordingly leaving the remaining 4 digits as they were - they represent the date of the firmware. Click "OK" when finished.
 
 4. Now you can regenerate the .xsa file as described above. If it gives an error look in the `Messages` tab what is the reason. Most likely the name of one of the ports is wrong. Open the selected constraint .xdc file and search for `clk_in` and give the ports on the Block Diagram the exact same name as in the .xdc (or vice versa). The port name can be changed by changing the `Name` entry in `External Port Properties`. 
 
@@ -83,15 +83,15 @@ If you want to generate the firmware for another buffer board, you have to enabl
 
 ## Software implementation
 
-Petalinux is a simple Linux distribution which allows to run an embedded Linux operating system on the CPU. The original board support package (.bsp) and demos are from [Digilent](https://reference.digilentinc.com/reference/software/petalinux/start) and require Petalinux 2017.4 installed on a Linux operating system. The present project works with Vivado and Petalinux 2020.1 on Ubuntu 20.04 LTS[^1]. For the installation of Petalinux 2020.1 please consult the [Petalinux Tools guide from Xilinx](https://docs.xilinx.com/v/u/2020.1-English/ug1144-petalinux-tools-reference-guide). More condensed information (probably not anymore fully up-to-date) can be obtained also from the [Cora-Z7-07S Petalinux BSP Project from Digilent](https://github.com/Digilent/Petalinux-Cora-Z7-07S/blob/master/README.md). The guides use the recommended installation folder /opt/pkg/petalinux[^2].
+Petalinux is a simple Linux distribution which allows to run an embedded Linux operating system on the CPU part of the FPGA-SoC chip. The original board support package (.bsp) and demos are from [Digilent](https://reference.digilentinc.com/reference/software/petalinux/start) and require Petalinux 2017.4 installed on a Linux operating system. The present project works with Vivado and Petalinux 2020.1 on Ubuntu 20.04 LTS[^1]. For the installation of Petalinux 2020.1 please consult the [Petalinux Tools guide from Xilinx](https://docs.xilinx.com/v/u/2020.1-English/ug1144-petalinux-tools-reference-guide). More condensed information (maybe not fully up-to-date) can be obtained from [Cora-Z7-07S Petalinux BSP Project from Digilent](https://github.com/Digilent/Petalinux-Cora-Z7-07S/blob/master/README.md). The guides use the recommended installation folder /opt/pkg/petalinux[^2].
 
 ### Generate Project
 
-We are still following the guide from before, but instead of using the Digilent bsp (which was the original bsp of my project), we use our project bsp (Petalinux-Cora-Z7-yy-20xx.x-0.bsp for your board with yy="10" or "07S") which you copy onto your computer, open a console and cd to a folder where you want the project to be located and create the project:
+From the [Petalinux directiory](/firmware-source/2020.1/Petalinux) copy the file ExpCtrl-Cora-Z7-yy-v1.4_zzzz.bsp for your board (yy="10" or "07S" and zzzz=release date), open a console and cd to a folder where you want the project to be located and create the project:
 
-    cd path-to-folder-where-new-project-should-be-created
-    source path-to-petalinux-installation-folder/settings.sh
-    petalinux-create -t project -s path/Petalinux-Cora-Z7-yy-20xx.x-x.bsp
+    cd <path-to-folder-where-new-project-should-be-created>
+    source <path-to-petalinux-installation-folder>/settings.sh
+    petalinux-create -t project -s <path to bsp file>/ExpCtrl-Cora-Z7-yy-v1.4_zzzz.bsp
 
 ### Using the pre-built images
 
