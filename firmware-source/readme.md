@@ -150,13 +150,6 @@ For the first time this will download the linux kernel (if not selected from loc
 
 Copy the files image.ub, BOOT.BIN and boot.scr from <project folder>/images/linux to the micro-SD card. You need also the server.config file with the proper IP address and other settings. See the folder with the [compiled firmware files](/firmware-release) for your board.
 
-### In case of problems
-
-- Check the board is powered (red LED is on) and power is stable - especially during booting. If using a wall-plug be absolutely sure it gives 5V DC. Steady-state current is 0.3A but during booting it might be higher. A supply with 1A is recommended.
-- There are two jumpers on the board, one for the power supply (near the jack) needs to be set to EXT or USB depending if you power from the jack (2.1-2.5mm center-positive) or via the USB plug. The second jumper should be shortened in order to boot from SD card.
-- About 1s after switching on the power a yellow LED should switch on in addtion to the red power LED. This indicates the bitstream was written to the FPGA part. If this is not the case then either the SD card is not properly inserted or corrupt, or the bitstream is for a different board. Check that the sticker on the FPGA-SoC chip reads "10" for the Cora-Z7-10 board or "7S" for the Cora-Z7-07S board and choose the proper firmware for the board. I had problems with low-quality SD cards which broke after only one month of usage although the board only reads the SD card and does not write (user software can also write to it when needed).
-- For debugging one can connect a micro-USB cable on the board and monitor the boot process and navigate in the file system: I use `minicom` (any other terminal program should work) with 115200/8/N/1 settings and Hardware flow control disabled. The board appears usally as `ttyUSB1` or `ttyUSB3` (if a second board is already connected). When a terminal program is connected, sometimes the board boots accidently into the `Zynq>` console (I think when some data is sent during booting), then enter: "boot" or push the `SRST` button and the board should boot again. After booting is completed enter as user `root` and password `root` to navigate in the linux file system.
-
 ### Change buffer board version
 
 In order to change the buffer board version you just need to give a proper .xsa file to Petalinux and recompile:
@@ -177,9 +170,9 @@ In the [Petalinux folder](/firmware-source/2020.1/Petalinux) I provide already t
 	        };
         };
 
-After this recompile as in the previous section.
+After this change, recompile as in the [previous section](/firmware-source#change-buffer-board-version).
 
-### Modifying Petalinux
+### Modifying the project
 
 These are the steps if you want to add new functionality. Execute these commands inside the project folder (except of packaging) and after sourcing petalinux.
 
@@ -197,7 +190,7 @@ This will add a driver template module to the project in the folder `/project-sp
  
 This will add a hello-world application in the folder /project-spec/meta-user/recipes-apps which you can edit. 
        
-3. Add a startup script:
+3. Add a startup script (here `fpga-init`):
         
         petalinux-create -t apps --template install -n fpga-init --enable   // use lowercase letters and do not use '_'
         petalinux-config -c rootfs                      // check if is in list of apps and enable if not --enable
@@ -219,4 +212,11 @@ Each of these commands opens a configuration menu where you can change the setti
         cd <location where bsp should be generated>
         petalinux-package --bsp -p <project folder> --hwsource <path to and name of xsa> --exclude-workspace --output <file name of .bsp>
         
+### In case of problems
+
+- Check the board is powered (red LED is on) and power is stable - especially during booting. If using a wall-plug be absolutely sure it gives 5V DC. Steady-state current is 0.3A but during booting it might be higher. A supply with 1A is recommended.
+- There are two jumpers on the board, one for the power supply (near the jack) needs to be set to EXT or USB depending if you power from the jack (2.1-2.5mm center-positive) or via the USB plug. The second jumper should be shortened in order to boot from SD card.
+- About 1s after switching on the power a yellow LED should switch on in addtion to the red power LED. This indicates the bitstream was written to the FPGA part. If this is not the case then either the SD card is not properly inserted or corrupt, or the bitstream is for a different board. Check that the sticker on the FPGA-SoC chip reads "10" for the Cora-Z7-10 board or "7S" for the Cora-Z7-07S board and choose the proper firmware for the board. I had problems with low-quality SD cards which broke after only one month of usage although the board only reads the SD card and does not write (user software can also write to it when needed).
+- For debugging one can connect a micro-USB cable on the board and monitor the boot process and navigate in the file system: I use `minicom` (any other terminal program should work) with 115200/8/N/1 settings and Hardware flow control disabled. The board appears usally as `ttyUSB1` or `ttyUSB3` (if a second board is already connected). When a terminal program is connected, sometimes the board boots accidently into the `Zynq>` console (I think when some data is sent during booting), then enter: "boot" or push the `SRST` button and the board should boot again. After booting is completed enter as user `root` and password `root` to navigate in the linux file system.
+
 
