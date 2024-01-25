@@ -82,9 +82,11 @@ If you want to generate the firmware for another buffer board, you have to enabl
 
 Petalinux is a simple Linux distribution which allows to run an embedded Linux operating system on the CPU part of the FPGA-SoC chip. The original board support package (.bsp) and demos are from [Digilent](https://reference.digilentinc.com/reference/software/petalinux/start) and require Petalinux 2017.4 installed on a Linux operating system. The present project works with Vivado and Petalinux 2020.1 on Ubuntu 20.04 LTS[^1]. For the installation of Petalinux 2020.1 please consult the [Petalinux Tools guide from Xilinx](https://docs.xilinx.com/v/u/2020.1-English/ug1144-petalinux-tools-reference-guide). More condensed information (maybe not fully up-to-date) can be obtained from [Cora-Z7-07S Petalinux BSP Project from Digilent](https://github.com/Digilent/Petalinux-Cora-Z7-07S/blob/master/README.md). The guides use the recommended installation folder /opt/pkg/petalinux[^2].
 
-The generated [.xsa files from Vivado](/firmware-source/2020.1/Vivado/xsa/) contains the bitstream (.bit) which the bootloader is uploading on the FPGA part and the device tree which is used by Petalinux to define external devices which can then be used with the appropriate driver in user-defined application software. Below you find how to create and compile the Petalinx project which generates the firmware files. Already compiled files you find in the [firmware release folder](/firmware-release/) for the different FPGA boards, buffer board versions and for primary and secondary boards.
+The generated [.xsa files from Vivado](/firmware-source/2020.1/Vivado/xsa/) contain the bitstream (.bit) which the bootloader is uploading on the FPGA part and the device tree used by Petalinux to define external devices which can then be accessed by user-defined application software. 
 
-### Generate Project
+Below you find how to create and compile the Petalinux project and generate the firmware files. Already compiled files you find in the [firmware release folder](/firmware-release/) for the different FPGA boards, buffer board versions and for primary and secondary boards.
+
+### Generate the Petalinux Project
 
 From the [Petalinux directiory](/firmware-source/2020.1/Petalinux) copy the file ExpCtrl-Cora-Z7-yy-v1.4_zzzz.bsp for your board (yy="10" or "07S" and zzzz=release date), open a console and cd to a folder where you want the project to be located and create the project:
 
@@ -94,9 +96,12 @@ From the [Petalinux directiory](/firmware-source/2020.1/Petalinux) copy the file
 
 This creates the project folder ExpCtrl-Cora-Z7-yy-v1.4_zzzz in the current directy. You can `cd` into the new project folder and start configuring and compiling (see next section).
 
+> [!NOTE]
+> After the project is created you cannot move or rename the project folder! Any attempt of compilation will break the project in a non-revertible way.
+
 ### Compiling the Petalinux project
 
-1. For compiling the Petalinux project cd into project folder and source petalinux (if not already done):
+1. For compiling the Petalinux project `cd` into the project folder and source petalinux (if not already done):
 
        cd <path-to-project-folder>
        source <petalinux-folder>/settings.sh
@@ -109,6 +114,7 @@ This creates the project folder ExpCtrl-Cora-Z7-yy-v1.4_zzzz in the current dire
        exit from all sub-menus and from configuration menu and select to save new configuration
   
 3. Set Linux Kernel Source (optional):
+
 This is useful if you have several projects, otherwise Petalinux will download it automatically for each project. 
     
        petalinux-config
@@ -117,7 +123,7 @@ This is useful if you have several projects, otherwise Petalinux will download i
        in "External linux-kernel local source settings" enter folder as "/home/<user name>/<path-to-folder>"
        download Kernel source into the selected folder 
 
-The project currently uses the [5.4 Linux kernel for petalinux 2020.1](https://github.com/Xilinx/linux-xlnx/releases/tag/xlnx_rebase_v5.4_2020.1).
+It should be possible using a relative folder I could not get it working. The project currently uses the [5.4 Linux kernel for petalinux 2020.1](https://github.com/Xilinx/linux-xlnx/releases/tag/xlnx_rebase_v5.4_2020.1).
 
 <!-- 
 https://github.com/Xilinx/linux-xlnx/releases/tag/xilinx-v2020.1
@@ -146,10 +152,32 @@ Copy the files image.ub, BOOT.BIN and boot.scr from <project folder>/images/linu
 
 ### In case of problems
 
-- Check the board is powered (red LED is on) and power is stable - especially during booting. If using a wall-plug be absolutely sure it gives 5V DC with more than 0.3A (1A recommended)!
-- There are two jumpers on the board, one for the power supply (near the jack) needs to be set to EXT or USB depending if you power from the jack (2.1-2.5mm center-positive) or via the USB plug
-- Ca. 1s after switching on the power a yellow LED should switch on in addtion to the red power LED. This indicates the bitstream was written to the FPGA part. If this is not the case then either the SD card is not properly inserted or corrupt, or the bitstream is for a different board. Check that the sticker on the FPGA-SoC chip reads "10" for the Cora-Z7-10 board or "7S" for the Cora-Z7-07S board and choose the proper firmware for the board. I had problems with low-quality SD cards which broke after only one month of usage although the board only reads the SD card and does not write (user software can also write to it when needed).
-- For debugging one can connect a micro-USB cable on the board and monitor the boot process: I use `minicom` (any other terminal program should work) with 115200/8/N/1 settings (no Hardware flow control). The board appears usally as `ttyUSB1` or `ttyUSB3` (if a second board is already connected). When a terminal is connected sometimes the board boots accidently into the `Zynq>` console (I think when some input is sent to the board during bootig), then enter: "boot" or push the `SRST` button and the board should boot again. After booting is completed enter as user `root` and password `root` to navigate in the linux file system.
+- Check the board is powered (red LED is on) and power is stable - especially during booting. If using a wall-plug be absolutely sure it gives 5V DC. Steady-state current is 0.3A but during booting it might be higher. A supply with 1A is recommended.
+- There are two jumpers on the board, one for the power supply (near the jack) needs to be set to EXT or USB depending if you power from the jack (2.1-2.5mm center-positive) or via the USB plug. The second jumper should be shortened in order to boot from SD card.
+- About 1s after switching on the power a yellow LED should switch on in addtion to the red power LED. This indicates the bitstream was written to the FPGA part. If this is not the case then either the SD card is not properly inserted or corrupt, or the bitstream is for a different board. Check that the sticker on the FPGA-SoC chip reads "10" for the Cora-Z7-10 board or "7S" for the Cora-Z7-07S board and choose the proper firmware for the board. I had problems with low-quality SD cards which broke after only one month of usage although the board only reads the SD card and does not write (user software can also write to it when needed).
+- For debugging one can connect a micro-USB cable on the board and monitor the boot process and navigate in the file system: I use `minicom` (any other terminal program should work) with 115200/8/N/1 settings and Hardware flow control disabled. The board appears usally as `ttyUSB1` or `ttyUSB3` (if a second board is already connected). When a terminal program is connected, sometimes the board boots accidently into the `Zynq>` console (I think when some data is sent during booting), then enter: "boot" or push the `SRST` button and the board should boot again. After booting is completed enter as user `root` and password `root` to navigate in the linux file system.
+
+### Change buffer board version
+
+In order to change the buffer board version you just need to give a proper .xsa file to Petalinux and recompile:
+
+        petalinux-config --get-hw-description=<path to xsa file>        // or './' instead of path
+        petalinux-build
+        petalinux-package --boot --force --fsbl images/linux/zynq_fsbl.elf --fpga images/linux/system.bit --u-boot
+        
+The same steps are needed after creating a new .xsa file with Vivado.
+
+### Change FPGA board version
+
+In the [Petalinux folder](/firmware-source/2020.1/Petalinux) I provide already the `bsp` to create the project for the different FPGA boards. It is however easy to switch between the board also in the project. First you have to edit the `system-user.dtsi` file in the folder `<project folder>/projet-spec/meta-user/recipes-bsp/device-tree/files` in order to tell Petalinux if the second CPU core is present or not. For the `Cora-Z7-10` comment the following entry which is needed for the `Cora-Z7-07S` board:
+        
+        &amba {
+	        ptm@f889d000 {
+		        cpu = <&cpu0>;
+	        };
+        };
+
+After this recompile as in the previous section.
 
 ### Modifying Petalinux
 
