@@ -78,12 +78,11 @@ If you want to generate the firmware for another buffer board, you have to enabl
 
 4. Now you can regenerate the .xsa file as described above. If it gives an error look in the `Messages` tab what is the reason. Most likely the name of one of the ports is wrong. Open the selected constraint .xdc file and search for `clk_in` and give the ports on the Block Diagram the exact same name as in the .xdc (or vice versa). The port name can be changed by changing the `Name` entry in `External Port Properties`. 
 
-> [!NOTE]
-> I am in the process of updating this page. The information below is not anymore up-to-date ...
-
 ## Software implementation
 
 Petalinux is a simple Linux distribution which allows to run an embedded Linux operating system on the CPU part of the FPGA-SoC chip. The original board support package (.bsp) and demos are from [Digilent](https://reference.digilentinc.com/reference/software/petalinux/start) and require Petalinux 2017.4 installed on a Linux operating system. The present project works with Vivado and Petalinux 2020.1 on Ubuntu 20.04 LTS[^1]. For the installation of Petalinux 2020.1 please consult the [Petalinux Tools guide from Xilinx](https://docs.xilinx.com/v/u/2020.1-English/ug1144-petalinux-tools-reference-guide). More condensed information (maybe not fully up-to-date) can be obtained from [Cora-Z7-07S Petalinux BSP Project from Digilent](https://github.com/Digilent/Petalinux-Cora-Z7-07S/blob/master/README.md). The guides use the recommended installation folder /opt/pkg/petalinux[^2].
+
+The generated [.xsa files from Vivado](/firmware-source/2020.1/Vivado/xsa/) contains the bitstream (.bit) which the bootloader is uploading on the FPGA part and the device tree which is used by Petalinux to define external devices which can then be used with the appropriate driver in user-defined application software. Below you find how to create and compile the Petalinx project which generates the firmware files. Already compiled files you find in the [firmware release folder](/firmware-release/) for the different FPGA boards, buffer board versions and for primary and secondary boards.
 
 ### Generate Project
 
@@ -93,35 +92,16 @@ From the [Petalinux directiory](/firmware-source/2020.1/Petalinux) copy the file
     source <path-to-petalinux-installation-folder>/settings.sh
     petalinux-create -t project -s <path to bsp file>/ExpCtrl-Cora-Z7-yy-v1.4_zzzz.bsp
 
-### Using the pre-built images
-
-In the sub-folder "pre-built" of the project you find the prebuilt images with which you can immediately run the board. 
-- copy the files BOOT.BIN (bootloader), image.ub (Linux image), uEnv.txt (Ethernet MAC address) and server.config (server IP address) on a micro-SD card. 
-- edit uEnv.txt and insert the MAC address given on the sticker of your board. 
-- edit server.config and insert the IP address which you want to use for your board.
-- insert the micro SD card into the board
-- short the "Mode" jumper on the board to boot from SD card
-- set the power jumper to "USB" or "EXT" depending on which power source you want to use (board needs less than 0.3A, so USB 2.0 should be fine)
-- ATTENTION: external supply must be 4.5-5.5V DC center positive! Power jack has inner diameter 2.1-2.5mm. There is no input protection or regulator on the input and with higher input voltage you can damage the board! Recommended supply current is >= 1A but my measurements show that with the current design the board draws slightly less than 0.3A.
-- power up the board
-- you should see the red power LED near the power jack and the yellow LED near the USB-A plug should be on, indicating that the bitstream has been programmed. The 3-color LEDs near the two pushbuttons should be green and red with low intensity. 
-- open minicom (or other terminal program) with 115200/8/N/1 settings (and no Hardware flow control). Connect your computer with a USB cable and the micro-USB connector on the board (used also for USB power if selected). The board appears usally as ttyUSB1 or ttyUSB3 (if a second board is already connected).
-- pressing Enter in the terminal program you should see the TX and RX LEDs blinking near the micro-USB connector and you should see the console of the board root@Cora-Z7-yy.
-- if you push the SRST button (or type "reboot") the board reboots and you can observe the booting process of the Linux. At the end you will see when the dio24 module is loaded and the server is started
-
-In case of problems:
-- check the board is powered (red LED is on) and power is stable - especially during booting. If using a wall-plug be absolutely sure it gives 5V DC with more than 0.3A (1A recommended)! 
-- if the yellow LED is not on, then the bitstream was not written. either the SD card is not properly inserted or the bitstream is corrupt or for a different board. check that the SD card is properly inserted: remove and insert again. check that the sticker on the FPGA-SoC chip reads "10" for the Cora-Z7-10 board or "7S" for the Cora-Z7-07S board. Choose the proper images for the board. try to copy the images again or try a different micro SD card.
-- sometimes the board boots accidently into the "Zynq>" console or you have entered something on the terminal during boot. Enter: "boot" or push the SRST button and the board should boot again.
+This creates the project folder ExpCtrl-Cora-Z7-yy-v1.4_zzzz in the current directy. You can `cd` into the new project folder and start configuring and compiling (see next section).
 
 ### Compiling the Petalinux project
 
-1. For compiling the Petalinux project cd into project folder and source petalinux if not already done:
+1. For compiling the Petalinux project cd into project folder and source petalinux (if not already done):
 
-       cd path-to-project-folder
+       cd <path-to-project-folder>
        source <petalinux-folder>/settings.sh
     
-2. For a new project you should set the MAC address to the one given on the sticker of the board:
+2. For a new project you should set the Ethernet MAC address to the one given on the sticker of the board:
 
        petalinux-config
        navigate to "Subsystem AUTO Hardware Settings" - "Ethernet Settings" - "Ethernet MAC address"
@@ -137,57 +117,78 @@ This is useful if you have several projects, otherwise Petalinux will download i
        in "External linux-kernel local source settings" enter folder as "/home/<user name>/<path-to-folder>"
        download Kernel source into the selected folder 
 
-As kernel source I use this from Xilinx: https://github.com/Xilinx/linux-xlnx/releases/tag/xilinx-v2017.4
+The project currently uses the [5.4 Linux kernel for petalinux 2020.1](https://github.com/Xilinx/linux-xlnx/releases/tag/xlnx_rebase_v5.4_2020.1).
 
-4. When you have changed the bitstream with Vivado:
-copy the design_1_wrapper.hdf file generated by Vivado from the "sdk" folder (see above) into the Petalinux project folder and type
+<!-- 
+https://github.com/Xilinx/linux-xlnx/releases/tag/xilinx-v2020.1
+https://github.com/Xilinx/linux-xlnx/releases/tag/xilinx-v2017.4 
+-->
+
+4. To select a new .xsa file generated with Vivado:
+copy the .xsa file generated by Vivado (see above) into the Petalinux project folder and type:
 
        petalinux-config --get-hw-description=./
        exit from configuration menu
+
+This assumes that only one .xsa file is in the project folder. Alternatively, you can also give the file name and path after the '='.
 
 5. Compile project:
 
        petalinux-build
     
-For the first time this will download the linux kernel (if not selected from local folder) and u-boot (bootloader source) and compiling will need some time (9 Minutes on my system including downloading). There will be 3 warnings but which can be savely ignored: the RDEPENDS warnings sometimes change.
-
-    WARNING: Host distribution "Ubuntu-18.04" has not been validated with this version of the build system; you may possibly experience unexpected failures. It is recommended that you use a tested distribution.
-    WARNING: FPGA-server-1.0-r0 do_package_qa: QA Issue: /usr/bin/FPGA-server contained in package FPGA-server requires libc.so.6(GLIBC_2.4), but no providers found in RDEPENDS_FPGA-server? [file-rdeps]
-    WARNING: FPGA-test-1.0-r0 do_package_qa: QA Issue: /usr/bin/FPGA-test contained in package FPGA-test requires libstdc++.so.6(CXXABI_1.3.8), but no providers found in RDEPENDS_FPGA-test? [file-rdeps]
-
-Sometimes building will fail when configuring of the fsbl (first stage bootloader) takes too long. I think it needs to wait until all other sources are compiled. Petalinux gives an error which looks like it was running out of memory, but I believe its rather a timeout during configuring? When you build it a second time it will work without problems since the dependent sources are already compiled and the fsbl should configure and compile immediately. 
+For the first time this will download the linux kernel (if not selected from local folder) and u-boot (bootloader source) and compilation will need some time (9 minutes on my laptop). The warnings related to the non-official Ubuntu version can be ignored. In the "Tasks Summary" output it should say "all succeeded" and no red messages should appear. Sometimes compilation fails, which is either a timeout (first-stage booloader config after 3 minutes waiting for other tasks to finish) or low memory (less likely) when many tasks run in parallel. Just compile again and it should work.
 
 6. Package files for booting from SD card:
 
-       petalinux-package --boot --force --fsbl images/linux/zynq_fsbl.elf --fpga images/linux/design_1_wrapper.bit --u-boot
+       petalinux-package --boot --force --fsbl images/linux/zynq_fsbl.elf --fpga images/linux/system.bit --u-boot
 
-Copy image.ub and BOOT.BIN from the /images/linux folder (not the pre-built folder) to the micro-SD card, ensure the server.config file with the proper IP address is as well on the SD card and if you have set the MAC address in petalinux-config you can remove the uEnv.txt file from the SD card.
+Copy the files image.ub, BOOT.BIN and boot.scr from <project folder>/images/linux to the micro-SD card. You need also the server.config file with the proper IP address and other settings. See the folder with the [compiled firmware files](/firmware-release) for your board.
 
+### In case of problems
 
-### Using Petalinux
+- Check the board is powered (red LED is on) and power is stable - especially during booting. If using a wall-plug be absolutely sure it gives 5V DC with more than 0.3A (1A recommended)!
+- There are two jumpers on the board, one for the power supply (near the jack) needs to be set to EXT or USB depending if you power from the jack (2.1-2.5mm center-positive) or via the USB plug
+- Ca. 1s after switching on the power a yellow LED should switch on in addtion to the red power LED. This indicates the bitstream was written to the FPGA part. If this is not the case then either the SD card is not properly inserted or corrupt, or the bitstream is for a different board. Check that the sticker on the FPGA-SoC chip reads "10" for the Cora-Z7-10 board or "7S" for the Cora-Z7-07S board and choose the proper firmware for the board. I had problems with low-quality SD cards which broke after only one month of usage although the board only reads the SD card and does not write (user software can also write to it when needed).
+- For debugging one can connect a micro-USB cable on the board and monitor the boot process: I use `minicom` (any other terminal program should work) with 115200/8/N/1 settings (no Hardware flow control). The board appears usally as `ttyUSB1` or `ttyUSB3` (if a second board is already connected). When a terminal is connected sometimes the board boots accidently into the `Zynq>` console (I think when some input is sent to the board during bootig), then enter: "boot" or push the `SRST` button and the board should boot again. After booting is completed enter as user `root` and password `root` to navigate in the linux file system.
 
-These are the first steps if you want to add new functionality.
+### Modifying Petalinux
 
-1. Add a new driver module (here dio24):
+These are the steps if you want to add new functionality. Execute these commands inside the project folder (except of packaging) and after sourcing petalinux.
 
-       petalinux-create -t modules -n dio24 --enable    // use lowercase only!
+1. Add a new driver module (here `dio24`):
+
+       petalinux-create -t modules -n dio24 --enable    // use lowercase letters and do not use '_'
        petalinux-config -c rootfs                       // check if module is in list and enable module if not --enable
-       petalinux-config -c kernel                       // exit without modifications. this might be needed for 1st module but not clear?
 
-This will add a demonstration driver module to the project in the folder /project-spec/meta-user/recipes-modules.
+This will add a driver template module to the project in the folder `/project-spec/meta-user/recipes-modules` which you can edit.
 
-2. Add a new C++ application (here FPGA-server):
+2. Add a new C++ application (here `fpga-server`):
 
-       petalinux-create -t apps --template c++ -n FPGA-server --enable  // do not use '_' in names!
+       petalinux-create -t apps --template c++ -n fpga-server --enable  // use lowercase letters and do not use '_'
        petalinux-config -c rootfs                       // check if app is in list and enable if not --enable
  
-This will add a hello-world demo application in the folder /project-spec/meta-user/recipes-apps. 
+This will add a hello-world application in the folder /project-spec/meta-user/recipes-apps which you can edit. 
        
 3. Add a startup script:
         
-        petalinux-create -t apps --template install -n FPGA-init --enable
+        petalinux-create -t apps --template install -n fpga-init --enable   // use lowercase letters and do not use '_'
         petalinux-config -c rootfs                      // check if is in list of apps and enable if not --enable
 
-This will add a demo install script in the folder /project-spec/meta-user/recipes-apps.
+This will add a demo installation script in the folder /project-spec/meta-user/recipes-apps which you can edit.
 
+4. Configure kernel, root file system (rootfs) and boot loader (u-boot):
+
+        petalinux-config -c kernel
+        petalinux-config -c rootfs
+        petalinux-config -c u-boot
+        
+Each of these commands opens a configuration menu where you can change the settings of each of the components.
+
+5. Package a project as bsp:
+
+        petalinux-build -c distclean        // clean project
+        peatlinux-build -c mrproper         // optional delete workspace and temporary files and folders
+        cd <location where bsp should be generated>
+        petalinux-package --bsp -p <project folder> --hwsource <path to and name of xsa> --exclude-workspace --output <file name of .bsp>
+        
 
