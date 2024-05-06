@@ -30,6 +30,7 @@ primary = FPGA_board(
     worker_args    = {                  # optional settings
         'outputs': {'output 0': ('sync out', 'low level')}, # trigger secondary board on experiment start.
         'ext_clock': False,             # if True use external clock reference
+        #'simulate' : True,              # if True simulate hardware
         }
     )
 
@@ -45,6 +46,7 @@ if False:
         worker_args     = {                 # optional settings
             'inputs' : {'start trigger' : ('input 0', 'falling edge')}, # use start trigger from primary board on input 0
             'ext_clock': True,              # use external clock from primary board.
+            #'simulate' : True,              # if True simulate hardware
         })
 else: secondary = None
 
@@ -68,10 +70,10 @@ AnalogOut     (name='ao3', parent_device=AO1, connection='0x06', unit_conversion
 
 if secondary is not None:
     AnalogChannels(name='AO2', parent_device=secondary, rack=0, max_channels=4)
-    AnalogOut     (name='ao4', parent_device=AO0, connection='0x07')
-    AnalogOut     (name='ao5', parent_device=AO0, connection='0x08')
-    AnalogOut     (name='ao6', parent_device=AO0, connection='0x09')
-    AnalogOut     (name='ao7', parent_device=AO0, connection='0x0a')
+    AnalogOut     (name='ao4', parent_device=AO2, connection='0x07')
+    AnalogOut     (name='ao5', parent_device=AO2, connection='0x08')
+    AnalogOut     (name='ao6', parent_device=AO2, connection='0x09')
+    AnalogOut     (name='ao7', parent_device=AO2, connection='0x0a')
 
 ########################################################################################################################
 # digital outputs
@@ -86,7 +88,7 @@ for i in range(16):
 if secondary is not None:
     DigitalChannels(name='DO1', parent_device=secondary, connection='0x01', rack=0, max_channels=16)
     for i in range(16):
-        DigitalOut(name='do%i'%i+16, parent_device=DO1, connection=i)
+        DigitalOut(name='do%i'%(i+16), parent_device=DO1, connection=i)
 
 ########################################################################################################################
 # experimental sequence

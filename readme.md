@@ -103,7 +103,4 @@ The FPGA-SoC replaces the DIO64 card but also improves the old system in several
   * the current bus hardware layout with the "strobe" signal instead of a real clock limits the output rate
   * the internal 100MHz bus clock of the board limits the output rate to 50MHz. a bus clock of 200MHz might be possible at the cost of higher latency and more resources used. individual I/O ports I have tested to run with 1GHz using parallel-to-serial and serial-to-parallel decoders (SERDES) on the chip but I think its not possible to use this on many port.
 
-> [!NOTE]
-> I am in the phase of updating this project. most is updated, the FPGA firmware source is not complete ...
-
 

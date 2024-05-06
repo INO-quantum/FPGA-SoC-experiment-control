@@ -6,7 +6,7 @@
 
 from __future__ import generator_stop
 import labscript.labscript
-from labscript import PseudoclockDevice, Pseudoclock, ClockLine, IntermediateDevice, DDS, DigitalOut, AnalogOut, set_passed_properties, LabscriptError, config, Output
+from labscript import PseudoclockDevice, Pseudoclock, ClockLine, IntermediateDevice, DDS, DigitalOut, AnalogOut, set_passed_properties, LabscriptError, config, Output, DDSQuantity
 from labscript_devices import BLACS_tab, runviewer_parser
 from labscript_utils.setup_logging import setup_logging
 from labscript_utils import import_or_reload
@@ -104,14 +104,14 @@ CLOCK_RESOLUTION = get_clock_resolution(MAX_BUS_RATE)
 MAX_TIME         = (2**32)-1
 MAX_TIME_SECONDS = MAX_TIME*CLOCK_RESOLUTION
 CLOCK_LIMIT      = get_clock_limit(MAX_BUS_RATE)
-save_print('FPGA_board: maximum bus rate %.3f MHz gives resolution %.3f ns and max time %.3f s (clock limit = bus rate + %.3f Hz)' % (MAX_BUS_RATE/1e6, CLOCK_RESOLUTION*1e9, MAX_TIME_SECONDS, CLOCK_LIMIT - MAX_BUS_RATE))
+#save_print('FPGA_board: maximum bus rate %.3f MHz gives resolution %.3f ns and max time %.3f s (clock limit = bus rate + %.3f Hz)' % (MAX_BUS_RATE/1e6, CLOCK_RESOLUTION*1e9, MAX_TIME_SECONDS, CLOCK_LIMIT - MAX_BUS_RATE))
 
 # smallest time step and start time in WORD units (ticks)
 TIME_STEP       = 1                         # must be 1
 START_TIME      = 0                         # note: FPGA board can start at time 0 since trigger delay is corrected.
 TIME_ROUND_DECIMALS = 10                    # time is rounded internally by labscript to 10 decimals = 100ps
 TIME_PRECISION  = 10.0**(-TIME_ROUND_DECIMALS) # time round precision in seconds
-UPDATE_TIME_MS  = 20                        # update time of BLACS board status in ms
+UPDATE_TIME_MS  = 500                        # update time of BLACS board status in ms
 
 #bus data structure
 ADDR_SHIFT      = 16                        # first bit of address 
@@ -287,6 +287,10 @@ def from_client_data32(bytes):
 def from_client_status(bytes):
     return struct.unpack('<2s3I', bytes)
 
+# inverse of from_client_status
+def to_client_status(cmd, board_status, board_time, board_samples):
+    return struct.pack('<2s3I', cmd, board_status, board_time, board_samples)
+
 # worker arguments
 STR_CONFIG              = 'config'
 STR_CONFIG_MANUAL       = 'config_manual'
@@ -297,7 +301,11 @@ STR_IGNORE_CLOCK_LOSS   = 'ignore_clock_loss'
 STR_SYNC_WAIT           = 'sync_wait'
 STR_SYNC_PHASE          = 'sync_phase'
 STR_CYCLES              = 'num_cycles'
-worker_args_keys = [STR_CONFIG, STR_CONFIG_MANUAL, STR_INPUTS, STR_OUTPUTS, STR_EXT_CLOCK, STR_IGNORE_CLOCK_LOSS, STR_SYNC_WAIT, STR_SYNC_PHASE, STR_CYCLES]
+STR_SIMULATE            = 'simulate'
+worker_args_keys = [STR_CONFIG, STR_CONFIG_MANUAL, STR_INPUTS, STR_OUTPUTS,
+                    STR_EXT_CLOCK, STR_IGNORE_CLOCK_LOSS,
+                    STR_SYNC_WAIT, STR_SYNC_PHASE, STR_CYCLES,
+                    STR_SIMULATE]
 
 # other
 STR_ALLOW_CHANGES       = 'allow_changes'
@@ -375,6 +383,7 @@ STATUS_BTN_1                = 1<<31          # button 1
 
 # combined status bits
 STATUS_ERROR                = STATUS_ERR_TX|STATUS_ERR_RX|STATUS_ERR_TIME|STATUS_ERR_LOCK|STATUS_ERR_TKEEP|STATUS_ERR_TKEEP2|STATUS_ERR_TKEEP3
+STATUS_SECONDARY_READY      = STATUS_READY | STATUS_AUTO_SYNC | STATUS_EXT_USED | STATUS_EXT_LOCKED
 
 # input control register
 CTRL_IN_SRC_BITS            = 3
@@ -703,7 +712,7 @@ def check_worker_args(worker_args):
                 ctrl_out = get_ctrl_out(value)
             else:
                 selection = get_out_selection(value, return_NONE=False)
-        elif (key == STR_EXT_CLOCK) or (key == STR_IGNORE_CLOCK_LOSS):
+        elif (key == STR_EXT_CLOCK) or (key == STR_IGNORE_CLOCK_LOSS) or (key == STR_SIMULATE):
             if not isinstance(value, bool):
                 raise LabscriptError("worker_arg '%s':'%s' must be True/False (bool)! but is %s" % (key, str(value), type(value)))
         elif (key == STR_SYNC_WAIT) or (key == STR_SYNC_PHASE) or (key == STR_CYCLES):
@@ -1079,7 +1088,7 @@ class FPGA_PseudoClock(Pseudoclock):
 
     def add_device(self, device):
         if isinstance(device, ClockLine):
-            save_print("%s: adding ClockLine '%s'%s" % (self.name, device.name, ' (locked)' if device.locked else ''))
+            save_print("%s: adding ClockLine '%s'" % (self.name, device.name))
             Pseudoclock.add_device(self, device)
         else:
             raise LabscriptError('%s allows only ClockLine child but you have connected %s (class %s).'%(self.name, device.name, device.__class__))
@@ -1169,18 +1178,18 @@ class SpecialOut(Output):
 
 # internal special Intermediate Device
 # needed for SpecialOut devices created one per rack
+# TODO: maybe can be replaced with markers?
 class SpecialIM(IntermediateDevice):
     description = 'internal device for special data'
     allowed_children = [SpecialOut]
     shared_address = False
 
-    def __init__(self, name, parent_device, bus_rate, clockline=None, **kwargs):
+    def __init__(self, name, parent_device, bus_rate, **kwargs):
         #parent device must be FPGA_board. you should not connect it directly to clockline.
-        # optional string 'clockline' allows to create an individual clockline for device for more efficient timing calculation.
         if not isinstance(parent_device, FPGA_board):
             raise LabscriptError("Device '%s' parent class is '%s' but must be '%s'!" % (self.name, parent_device.__class__, FPGA_board))
         # get clockline from FPGA_board and set as parent
-        self.parent_device = parent_device.get_clockline(self, bus_rate, clockline)
+        self.parent_device = parent_device.get_clockline(self, bus_rate)
         # init device with clockline as parent
         IntermediateDevice.__init__(self, name, self.parent_device, **kwargs)
 
@@ -1199,13 +1208,12 @@ class DigitalChannels(IntermediateDevice):
     #clock_limit = CLOCK_LIMIT
     #num_racks = 0 # set to maximum allowed number of racks given by FPGA_board
 
-    def __init__(self, name, parent_device, connection, rack, max_channels, bus_rate=MAX_BUS_RATE, clockline=None, **kwargs):
+    def __init__(self, name, parent_device, connection, rack, max_channels, bus_rate=MAX_BUS_RATE, **kwargs):
         #parent device must be FPGA_board. you should not connect it directly to clockline.
-        # optional string 'clockline' allows to create an individual clockline for device for more efficient timing calculation.
         if not isinstance(parent_device, FPGA_board):
             raise LabscriptError("Device '%s' parent class is '%s' but must be '%s'!" % (self.name, parent_device.__class__, FPGA_board))
         # get clockline from FPGA_board and set as parent
-        self.parent_device = parent_device.get_clockline(self, bus_rate, clockline)
+        self.parent_device = parent_device.get_clockline(self, bus_rate)
         # init device with clockline as parent
         IntermediateDevice.__init__(self, name, self.parent_device, **kwargs)
 
@@ -1321,13 +1329,12 @@ class AnalogChannels(IntermediateDevice):
     #clock_limit = CLOCK_LIMIT
     #num_racks = 0 # set to maximum allowed number of racks given by FPGA_board
 
-    def __init__(self, name, parent_device, rack, max_channels, bus_rate=MAX_BUS_RATE, clockline=None, **kwargs):
+    def __init__(self, name, parent_device, rack, max_channels, bus_rate=MAX_BUS_RATE, **kwargs):
         # parent device must be FPGA_board. you should not connect it directly to clockline.
-        # optional string 'clockline' allows to create an individual clockline for device for more efficient timing calculation.
         if not isinstance(parent_device, FPGA_board):
             raise LabscriptError("Device '%s' parent class is '%s' but must be '%s'!" % (self.name, parent_device.__class__, FPGA_board))
         # get clockline from FPGA_board and set as parent_device
-        self.parent_device = parent_device.get_clockline(self, bus_rate, clockline)
+        self.parent_device = parent_device.get_clockline(self, bus_rate)
         # init device with clockline as parent
         IntermediateDevice.__init__(self, name, self.parent_device, **kwargs)
 
@@ -1461,9 +1468,11 @@ class FPGA_board(PseudoclockDevice):
                 self.primary_board = trigger_device
                 self.primary_board.add_device(self)
                 self.is_primary = False
-            else: # external trigger device like PulseBlaster
+            else:
+                # external trigger device like PulseBlaster
+                # boards are independent but need to wait for start trigger
                 self.is_primary = True
-                self.primary_board = False
+                self.primary_board = None
             inputs = default_in_sec
             outputs = default_out_sec
 
@@ -1511,9 +1520,9 @@ class FPGA_board(PseudoclockDevice):
         self.set_property('num_racks', self.num_racks, 'connection_table_properties')
 
         # create num_racks SpecialOut devices to store special data bits per rack
-        # we need one SpecialIM device and one special (and locked=exclusive) clockline for this.
+        # we need one SpecialIM device for this.
         # note: the special data bits are not sent to devices, so we can set maximum bus rate but this might have unintended side-effects?
-        self.special_IM   = SpecialIM(name='%s_special_IM'%self.name, parent_device=self, bus_rate=self.bus_rate, clockline=("special",True))
+        self.special_IM   = SpecialIM(name='%s_special_IM'%self.name, parent_device=self, bus_rate=self.bus_rate)
         self.special_data = [SpecialOut(name='%s_special_data_%i'%(self.name,i),
                                         parent_device=self.special_IM,
                                         connection='%s_special_data_%i_con'%(self.name,i),
@@ -1536,7 +1545,7 @@ class FPGA_board(PseudoclockDevice):
             PseudoclockDevice.add_device(self, device)
         elif isinstance(device, labscript.labscript.Trigger):
             save_print("%s: adding Trigger '%s'" % (self.name, device.name))
-            # for each secondary board the primary board gets a Trigger device but I dont know what to do with it?
+            # TODO: for each secondary board the primary board gets a Trigger device but I dont know what to do with it?
             pass
         elif isinstance(device, PseudoclockDevice):
             save_print("%s: adding secondary board '%s'" % (self.name, device.name))
@@ -1548,17 +1557,16 @@ class FPGA_board(PseudoclockDevice):
         else:
             raise LabscriptError("%s: adding %s '%s' is not allowed!" % (self.name, device.__class__, device.name))
 
-    def get_clockline(self, device, bus_rate, clockline=None):
+    def get_clockline(self, device, bus_rate):
         """
-        finds or creates appropriate pseudoclock and clockline with given maximum bus_rate in Hz.
-        clockline can be given as clockline=None, clockline=name or clockline=(name,locked)
-        if name is not None searches the first clockline which ends with this name, if not found or name is None creates new.
-        if locked = True then the new clockline is reserved for the given device and cannot be shared with another device even if name given.
+        creates pseudoclock and clockline with given maximum bus_rate in Hz.
+        updated: now creates for all intermediate devices a separate clockline.
+                 this should improve performance of generate_code since does not need to interpolate which we do not want.
         returns clockline with given maximum bus_rate.
         call from __init__ of all intermediate devices to get parent_device.
         """
         # note about pseudoclocks and clocklines (as far as I understand):
-        # the hirarchial connection is from parent - >child:
+        # the hirarchial connection is from parent -> child:
         #       PseudoclockDevice (FPGA_board) -> pseudoclock (FPGA_PseudoClock) -> clockline -> intermediate device -> channels
         # different clocklines on the SAME pseudoclock are interfering!
         # i.e. the smallest bus_rate on any clockline is limiting the entire pseudoclock!
@@ -1572,73 +1580,27 @@ class FPGA_board(PseudoclockDevice):
         if not isinstance(device, (IntermediateDevice, FPGA_board)):
             raise LabscriptError("device '%s' class '%s' must be 'IntermediateDevice'!" % (device.name, device.__class__))
 
-        if clockline is None:
-            locked = False
-        elif isinstance (clockline, (tuple,list)):
-            clockline, locked = clockline
-        else:
-            locked = False
+        # create new pseudoclock with given rate
+        line_index = 0
+        index = 0
+        for child in self.child_devices:
+            if isinstance(child, Pseudoclock):
+                index += 1
+        # find smallest digit of bus_rate
+        name = self.PCLOCK_FORMAT % (self.name, index, prefix(bus_rate, "Hz"))
+        connection = self.CON_FORMAT % (name)
+        pseudoclock = FPGA_PseudoClock(name=name, pseudoclock_device=self, connection=connection)
+        pseudoclock.bus_rate = bus_rate
+        # set clock limit and resolution
+        pseudoclock.clock_limit = get_clock_limit(bus_rate)
+        pseudoclock.clock_resolution = get_clock_resolution(bus_rate)
 
-        # check bus rate is not larger MAX_BUS_RATE [disabled. TODO: device will be limited but should still work?]
-        #if bus_rate > self.bus_rate:
-        #    raise LabscriptError("device '%s' bus rate %.3f MHz > maximum possible %.3f MHz!" % (device.name, bus_rate/1e6, self.bus_rate/1e6))
-        # find a peseudoclocck with the same bus rate
-        # if clockline is given needs to have also same name, otherwise create a new clockline with this name.
-        pseudoclock = None
-        _clockline = None
-        line_index = None
-        for pc in self.child_devices:
-            if not isinstance(pc, Pseudoclock): # sanity check
-                raise LabscriptError("get_clockline: '%s' is not Pseudoclock but '%s'!" % (pc.name, type(pc)))
-            if pc.bus_rate == bus_rate:
-                pseudoclock = pc # we always take first pseudoclock with same rate
-                if not locked:
-                    # new clockline is not locked: search for matching clockline if name given
-                    if clockline is None: # take first clockline which is not locked
-                        for index, cl in enumerate(pc.child_devices):
-                            if not cl.locked:
-                                _clockline = cl
-                                line_index = index
-                                break
-                    else:
-                        # take first existing not locked clockline ending with given name
-                        num = len(clockline.split(self.CLOCK_FORMAT_SEP))
-                        for index,cl in enumerate(pc.child_devices):
-                            if not cl.locked and (self.CLOCK_FORMAT_SEP.join(cl.name.split(self.CLOCK_FORMAT_SEP)[-num:]) == clockline):
-                                _clockline  = cl
-                                line_index = index
-                                break
-                    if (_clockline is not None) and (not isinstance(_clockline, ClockLine)):
-                        # sanity check
-                        raise LabscriptError("get_clockline: '%s' is not ClockLine but '%s'!" % (_clockline.name, type(_clockline)))
-                if line_index is None:
-                    line_index = len(pseudoclock.child_devices)
-                break
-        if pseudoclock is None:
-            # create new pseudoclock with given rate
-            line_index = 0
-            index = 0
-            for child in self.child_devices:
-                if isinstance(child, Pseudoclock):
-                    index += 1
-            # find smallest digit of bus_rate
-            name = self.PCLOCK_FORMAT % (self.name, index, prefix(bus_rate, "Hz"))
-            connection = self.CON_FORMAT % (name)
-            pseudoclock = FPGA_PseudoClock(name=name, pseudoclock_device=self, connection=connection)
-            pseudoclock.bus_rate = bus_rate
-            # set clock limit and resolution
-            pseudoclock.clock_limit = get_clock_limit(bus_rate)
-            pseudoclock.clock_resolution = get_clock_resolution(bus_rate)
-        if _clockline is None:
-            # create new clockline with given name or default name from line_index = number of clocklines - 1
-            if clockline is None:
-                clockline_name = self.CLOCKLINE_FORMAT % (pseudoclock.name, line_index)
-            else:
-                clockline_name = self.CLOCKLINE_FORMAT_NAME % (pseudoclock.name, line_index, clockline)
-            connection = self.CON_FORMAT % (clockline_name)
-            _clockline = ClockLine(name=clockline_name, pseudoclock=pseudoclock, connection=connection, call_parents_add_device=False)
-            _clockline.locked = locked
-            pseudoclock.add_device(_clockline)
+        # create new clockline with given name or default name from line_index = number of clocklines - 1
+        clockline_name = self.CLOCKLINE_FORMAT % (pseudoclock.name, line_index)
+        connection = self.CON_FORMAT % (clockline_name)
+        _clockline = ClockLine(name=clockline_name, pseudoclock=pseudoclock, connection=connection, call_parents_add_device=False)
+        pseudoclock.add_device(_clockline)
+
         # return new clockline
         return _clockline
 
@@ -1662,16 +1624,103 @@ class FPGA_board(PseudoclockDevice):
                         save_print('%9i %9u 0x%08x' % (i, data[i, 0], data[i, 1]))
             save_print()
 
+    @staticmethod
+    def get_table_mode_channels(pseudoclock_device):
+        """
+        returns list with channels with table_mode = True and trigger_each_step = True.
+        recursively searches for channels including in triggered child devices
+        """
+        table_mode_channels = []
+        for pseudoclock in pseudoclock_device.child_devices:
+            for clockline in pseudoclock.child_devices:
+                for IM in clockline.child_devices:
+                    # TODO: at the moment table_mode is defined for intermediate device. maybe define per channel?
+                    if hasattr(IM, 'table_mode') and IM.table_mode and \
+                       hasattr(IM, 'trigger_each_step') and IM.trigger_each_step:
+                        table_mode_channels += IM.child_devices
+                    else:
+                        # we must search all digital channels if they are triggering any
+                        # pseudoclock device like Moglabs_QRF
+                        for dev in IM.child_devices:
+                            for psd in dev.child_devices:
+                                table_mode_channels += FPGA_board.get_table_mode_channels(psd)
+        return table_mode_channels
 
     def generate_code(self, hdf5_file):
         global total_time
         
-        save_print("\n'%s' generating code ...\n" % (self.name))
         if total_time is None:
             total_time = get_ticks()
+            save_print("\n'%s' generating code (start) ...\n" % (self.name))
+        else:
+            save_print("'%s' generating code (0) %.3fms ..." % (self.name, (get_ticks() - total_time) * 1e3))
 
+        # insert instructions for table_mode devices like QRF DDS
+        # notes:
+        # - applies to devices with device.table_mode = True and device.trigger_each_step = True.
+        # - these devices must have a device.gate digital output associated given as 'digital_gate' in __init__.
+        #   additional required properties: trigger_delay and trigger_duration.
+        # - for each instruction at time t we add two gate instructions:
+        #   device.gate.go_high(t-device.trigger_delay)
+        #   device.gate.go_low(t-device.trigger_delay+device.trigger_duration)
+        # - if the user has manually inserted instructions for device.gate we give an error here.
+        # - this allows to program the frequency, amplitude, phase of the DDS for arbitrary times without the user
+        #   requiring to activate the gate for each step.
+        # - this needs to be called before PseudoclockDevice.generate_code, otherwise new instructions are not taken.
+        # TODO: not fully tested. work in progress.
+        table_mode_channels = FPGA_board.get_table_mode_channels(self)
+        if len(table_mode_channels) > 0:
+            print('%i table mode channels found:' % len(table_mode_channels))
+            for dev in table_mode_channels:
+                if (not hasattr(dev, 'gate')) or (not hasattr(dev.parent_device, 'trigger_delay')) or (not hasattr(dev.parent_device, 'trigger_duration')):
+                    raise LabscriptError("%s error: no 'gate' defined or parent has not 'trigger_delay' or no 'trigger_duration'!" % (dev.name))
+                if len(dev.gate.instructions) > 2:
+                    raise LabscriptError("%s error: in table mode do not call enable/disable or gate.go_low/go_high but program directly frequency/amplitude/phase!" % (dev.name))
+                # get times
+                trigger_delay    = dev.parent_device.trigger_delay
+                trigger_duration = dev.parent_device.trigger_duration
+                times = []
+                if isinstance(dev, DDSQuantity):
+                    # DDS has frequency, amplitude and phase. we need the times.
+                    for child in dev.child_devices:
+                        for key in child.instructions.keys():
+                            if isinstance(key, dict):
+                                # TODO: at the moment ramps are not working here! maybe call expand_timeseries?
+                                raise LabscriptError("%s error: at the moment no ramps are allowed for this device! use individual commands." % (dev.name))
+                        times += list(child.instructions.keys())
+                else:
+                    for key in child.instructions.keys():
+                        if isinstance(key, dict):
+                            # TODO: at the moment ramps are not working here! maybe call expand_timeseries?
+                            raise LabscriptError("%s error: at the moment no ramps are allowed for this device! use individual commands." % (dev.name))
+                    times += list(child.instructions.keys())
+                # get unique times and sort with increasing time.
+                times = np.unique(times)
+                if len(times) > 0:
+                    # activate gate for each time
+                    # TODO: use functions.pulse_sequence
+                    trigger_delay = 0
+                    for t in times:
+                        if (t - trigger_delay) < 0:
+                            raise LabscriptError("%s error: time %f with trigger_delay %f gives negative time %f!" % (dev.name, t, trigger_delay, t - trigger_delay))
+                        dev.gate.go_high(t - trigger_delay)
+                        dev.gate.go_low(t - trigger_delay + trigger_duration)
+                    print('%s: %i gate instructions added' % (dev.name, len(times)))
+                    print(times)
+                    print(dev.gate.instructions)
+
+        save_print("'%s' generating code (1) %.3fms ..." % (self.name, (get_ticks() - total_time) * 1e3))
+
+        # TODO:
+        # - maybe this call is not needed? we can do everything below directly from dev.instructions
+        #   only the error checking would be nice.
+        # - alternative: use separate clockline for each IM device then no interpolation is done.
+        #   this is not needed for FPGA board, causes more work and memory and time.
+        # - check why many digital pulses take so long to compile?
+        #   I think its in this call and not in my code. maybe with separate clock lines its already better?
         PseudoclockDevice.generate_code(self, hdf5_file)
-        print('total_time %.3fms' % ((get_ticks() - total_time) * 1e3))
+
+        save_print("'%s' generating code (2) %.3fms ..." % (self.name, (get_ticks() - total_time) * 1e3))
 
         t_start = get_ticks()
         # experimental:
@@ -1696,7 +1745,7 @@ class FPGA_board(PseudoclockDevice):
         special_STRB = False
         final_values = {} # final state of each used channel
         for pseudoclock in self.child_devices:
-            #print('%s:'%pseudoclock.name)
+            #print('ps_clock %s:'%pseudoclock.name)
             for clockline in pseudoclock.child_devices:
 
                 t = pseudoclock.times[clockline]
@@ -1711,10 +1760,10 @@ class FPGA_board(PseudoclockDevice):
                 indices = np.argwhere(np.isin(times, t)).ravel()
 
                 if len(indices) != len(t): # sanity check
-                    raise LabscriptError('generate_code: no all times of pseudoclock found? (should not happen)')
+                    raise LabscriptError('generate_code: not all times of pseudoclock found? (should not happen)')
 
                 for IM in clockline.child_devices:
-                    #print('%s:'%IM.name)
+                    #print('IM device %s:'%IM.name)
 
                     # skip special devices (will be treated after all other below)
                     if isinstance(IM, SpecialIM):
@@ -1728,11 +1777,15 @@ class FPGA_board(PseudoclockDevice):
                         chg = np.zeros(shape=(len(t),), dtype=np.bool_)
 
                         for dev in IM.child_devices:
+                            #print('device %s: %i times' % (dev.name, len(dev.raw_output)))
                             #if np.count_nonzero(dev.raw_output == dev.default_value) != len(t):
-                            #    #print('%s instr:'%dev.name, dev.instructions)
-                            #    print('%s raw data:' % dev.name, dev.raw_output)
+                            #print('%s instr:'%dev.name, dev.instructions)
+                            #print('%s raw data:' % dev.name, dev.raw_output)
 
                             if len(dev.raw_output) != len(t):  # sanity check.
+                                print('device %s: %i times' % (dev.name, len(dev.raw_output)))
+                                print(dev.raw_output)
+                                print(dev.times)
                                 raise LabscriptError('generate_code: raw output (%i) not consistent with times (%i)? (should not happen)' % (len(dev.raw_output), len(t)))
 
                             # convert raw data into data word and accumulate with other channels
@@ -1750,12 +1803,12 @@ class FPGA_board(PseudoclockDevice):
 
                         # check conflicts with devices of different address
                         i = indices[chg]
-                        conflicts[i,dev.rack] |= changes[i,dev.rack]
-                        changes[i,dev.rack] = True
+                        conflicts[i,IM.rack] |= changes[i,IM.rack]
+                        changes[i,IM.rack] = True
 
                         # save data where output changed
                         # we have to mask NOP bit from unused channels
-                        data[i,dev.rack+1] = d[chg] & DATA_ADDR_MASK
+                        data[i,IM.rack+1] = d[chg] & DATA_ADDR_MASK
                     else:
                         # no shared address: collect data for each individual device
                         for dev in IM.child_devices:
@@ -1878,8 +1931,10 @@ class FPGA_board(PseudoclockDevice):
                                 if info[4][i] == t:
                                     if info[0] == TYPE_DO: # digital out
                                         s2 = "0x%02x" % (info[2])
-                                        s5 = '-' if info[5][i] == DO_AUTO_VALUE else ("low" if info[5][i]==0 else "high")
-                                        s6 = '-' if info[6][i] == DO_AUTO_VALUE else ("low" if info[6][i]==0 else "high")
+                                        #s5 = '-' if info[5][i] == DO_AUTO_VALUE else ("low" if info[5][i]==0 else "high")
+                                        #s6 = '-' if info[6][i] == DO_AUTO_VALUE else ("low" if info[6][i]==0 else "high")
+                                        s5 = "low" if info[5][i]==0 else "high"
+                                        s6 = "low" if info[6][i]==0 else "high"
                                         s7 = ''
                                     elif info[0] == TYPE_AO: # analog out
                                         s2 = "0x%02x" % (info[2])
@@ -1967,7 +2022,7 @@ class FPGA_board(PseudoclockDevice):
         self.set_property('is_master_pseudoclock', self.is_master_pseudoclock, location='device_properties')
         self.set_property('stop_time', self.stop_time, location='device_properties')
 
-        save_print("'%s' generating code done" % (self.name))
+        save_print("'%s' generating code (3) %.3fms ..." % (self.name, (get_ticks() - total_time) * 1e3))
 
         # save if primary board and list of secondary boards names, or name of primary board.
         # the names identify the worker processes used for interprocess communication.
@@ -1982,11 +2037,16 @@ class FPGA_board(PseudoclockDevice):
         t_end = get_ticks()
         t_new = (t_end - t_start) * 1e3
         self.show_data(data, 'data: (%.3fms)' % (t_new))
-        print('total_time %.3fms' % ((get_ticks() - total_time) * 1e3))
 
+        save_print("'%s' generating code (4) %.3fms ..." % (self.name, (get_ticks() - total_time) * 1e3))
+
+        # TODO: generate_code is not called for secondary boards? so have to call it manually.
+        #       for iPCdev needed to comment generate_code in intermediate_device, then was working. here not?!
         for secondary in self.secondary_boards:
             save_print('%s call generate code for %s' % (self.name, secondary.name))
             secondary.generate_code(hdf5_file)
+
+        save_print("'%s' generating code (5) %.3fms done.\n" % (self.name, (get_ticks() - total_time) * 1e3))
 
     def SKIP(self, time, rack=0, do_not_toggle_STRB=False):
         "set NOP bit or do not toggle strobe bit at given time = time is waited but no output generated"
@@ -2253,6 +2313,8 @@ class RunviewerClass(object):
                             if clockline.device_class == 'ClockLine':
                                 value = [(i & 1) for i in range(len(time))]
                                 add_trace(clockline.name, (time, value), None, None)
+                                #print('clock %s adding %i times' % (clockline.name, len(time)))
+                                save_print("clock '%s' %i samples" % (clockline.name, len(value)))
                                 traces[clockline.name] = (time, value)
             elif self.type == TYPE_AO: # analog outputs (intermediate device)
                 save_print("'%s:%s' add trace (analog out) %i samples" % (self.top.name, self.name, len(data)))
@@ -2301,8 +2363,8 @@ class RunviewerClass(object):
                             # we add trace for all channels, even if not used
                             add_trace(name, (time, value), self, ch_name)
                             traces[name] = (time, value)
-                            save_print("'%s' (%s) %i samples" % (name, ch_name, len(value)))
-                            if len(value) <= 2:
+                            save_print("analog out '%s' (%s) %i samples %.3f - %.3fV" % (name, ch_name, len(value), np.min(value), np.max(value)))
+                            if len(value) <= 20:
                                 save_print(np.transpose([time,value]))
                         #else: # address is not used
                         #   save_print("'%s' (%s) not used" % (name, ch_name))
@@ -2350,7 +2412,7 @@ class RunviewerClass(object):
                         # add_trace(name, (time, value), parent, conn)
                         add_trace(name, (time, value), self, ch_name)
                         traces[name] = (time, value)
-                        save_print("'%s' (%s) %i samples" % (name, ch_name, len(value)))
+                        save_print("digital out '%s' (%s) %i samples" % (name, ch_name, len(value)))
                         if len(value) <= 2:
                             save_print(np.transpose([time,value]))
                     #else: # address is not used
@@ -2358,7 +2420,7 @@ class RunviewerClass(object):
                     #    time = np.array([data[0, 0], data[-1, 0]]) / self.bus_rate
                     #    value = np.array([0, 0])
             else: # DDS not implemented
-                save_print("'%s:%s' add trace (unknown?) %i samples" % (self.top_name, self.name, len(data)))
+                save_print("'%s:%s' add trace (unknown?) %i samples" % (self.top.name, self.name, len(data)))
         #TODO: not sure what to return here?
         return traces
 
@@ -3388,7 +3450,7 @@ class FPGA_Worker(Worker):
         self.board_time = 0
         self.board_samples = 0
         self.abort = False
-        self.t_start = 0;
+        self.t_start = [0,0]; # start time from transition_to_manual and start_run
         self.final_values = {}
         self.front_panel_values = {}
 
@@ -3401,6 +3463,7 @@ class FPGA_Worker(Worker):
         self.sync_wait  = SYNC_WAIT_AUTO
         self.sync_phase = SYNC_PHASE_AUTO
         self.num_cycles = CONFIG_CYCLES
+        self.simulate   = False
         if self.is_primary:
             # primary board
             self.config = self.config_manual | CTRL_AUTO_SYNC_EN | CTRL_AUTO_SYNC_PRIM
@@ -3432,10 +3495,11 @@ class FPGA_Worker(Worker):
             self.onChangeExtClock(self.ext_clock)
             self.onChangeIgnoreClockLoss(self.ignore_clock_loss)
 
-        # connect - open - reset - configure board
-        # on error: we disconnect and set self.sock=None
-        #           in program_manual and transition_to_buffered we retry
-        self.sock = init_connection("'%s' init"%self.device_name, self.con, self.config_manual)
+        if not self.simulate:
+            # connect - open - reset - configure board
+            # on error: we disconnect and set self.sock=None
+            #           in program_manual and transition_to_buffered we retry
+            self.sock = init_connection("'%s' init"%self.device_name, self.con, self.config_manual)
         self.first_time = True
 
         # prepare zprocess events for communication between primary and secondary boards
@@ -3454,115 +3518,96 @@ class FPGA_Worker(Worker):
         # reduce number of log entries in logfile (labscript-suite/logs/BLACS.log)
         self.logger.setLevel(log_level)
 
+        print('simulate:', self.simulate)
+        print("source file:", __file__)
+
     def program_manual(self, front_panel_values):
         # save actual front panel values
         # TODO: last values are saved in do_list, ao_list and self.front_pane_values and last values of sequence are saved in final_values.
         self.front_panel_values = front_panel_values
 
-        if self.sock == None: # try to reconnect to device
-            self.sock = init_connection("'%s' prg. manual"%self.device_name, self.con, self.config_manual)
-
-        if False and (not self.first_time):
-            # test: send event between boards BEFORE the other side waits for it
-            wait = not self.is_primary
-            for loop in range(10):
-                if wait:
-                    sleep(5.0) # sleep here to allow posting board to send event before we wait
-                    for i, evt in enumerate(self.events):
-                        ticks = get_ticks()
-                        try:
-                            result = evt.wait(self.count, timeout=5.0)
-                            t_end = get_ticks()
-                            save_print("%i '%s' wait '%s': %s, posted %.3fms waited %.3fms (%i)" % (loop, self.device_name, self.boards[i], result[1], (t_end - result[0])*1e3, (t_end - ticks)*1e3, self.count))
-                        except zTimeoutError:
-                            save_print("%i '%s' wait '%s': timeout %.3fs (%i)" % (loop, self.device_name, self.boards[i], get_ticks()-ticks, self.count))
-                            return None
-                else: # post as fast as possible
-                    #sleep(1.0)
-                    for i,evt in enumerate(self.events):
-                        evt.post(self.count, data=(get_ticks(), 't_%i'%(self.count/2)))
-                    save_print("%i: '%s' posted %i events" % (loop, self.device_name, len(self.events)))
-                # change role
-                wait = not wait
-                self.count += 1
-            save_print("'%s' %i loops done!" % (self.device_name, loop+1))
-            #self.first_time = False
-
-        if self.sock is not None: # device (re-)connected
-            save_print("'%s' prg. manual" % (self.device_name))
-            # 1. we first loop through all channels and generate a list of changed digital channels.
-            # 2. for changed analog channels we can already generate samples since each channel has its unique address.
-            data = []
-            time = START_TIME
-            sample = [time] + [BIT_NOP_SH]*self.num_racks
-            do_IDs = []
-            #save_print(self.do_list)
-            #save_print('final values:', self.final_values)
-            #save_print('GUI   values:', front_panel_values)
-            for key, value in front_panel_values.items():
+        # 1. we first loop through all channels and generate a list of changed digital channels.
+        # 2. for changed analog channels we can already generate samples since each channel has its unique address.
+        data = []
+        time = START_TIME
+        sample = [time] + [BIT_NOP_SH]*self.num_racks
+        do_IDs = []
+        #save_print(self.do_list)
+        #save_print('final values:', self.final_values)
+        #save_print('GUI   values:', front_panel_values)
+        for key, value in front_panel_values.items():
+            try:
+                [ID, last] = self.do_list[key] # DigitalChannels
+                if self.first_time or (value != last):
+                    if value != last: save_print("'%s' changed from %i to %i" % (key, last, value))
+                    do_IDs = do_IDs + [ID] # save changed ID
+                    self.do_list[key] = [ID, value] # save new state
+            except KeyError:
                 try:
-                    [ID, last] = self.do_list[key] # DigitalChannels
+                    [ID, last] = self.ao_list[key] # AnalogChannels
                     if self.first_time or (value != last):
-                        if value != last: save_print("'%s' changed from %i to %i" % (key, last, value))
-                        do_IDs = do_IDs + [ID] # save changed ID
-                        self.do_list[key] = [ID, value] # save new state
-                except KeyError:
-                    try:
-                        [ID, last] = self.ao_list[key] # AnalogChannels
-                        if self.first_time or (value != last):
-                            if value != last: save_print("'%s' changed from %f to %f" % (key, last, value))
-                            rack = get_rack(ID)
-                            address = get_address(ID)
-                            # TODO: units conversion? it would be good to have only one function for this!
-                            sample[rack+1] = (address<<ADDR_SHIFT)|((int((value*0x7fff) + 0.5)//10) & 0xffff)
-                            data.append(sample)
-                            time += TIME_STEP
-                            sample = [time] + [BIT_NOP_SH]*self.num_racks
-                            self.ao_list[key] = [ID, value]
-                    except KeyError: # unknown device?
-                        save_print("unknown device '%s', value %f" % (key, value))
-            # 3. for changed digital channels we have to collect all channel bits (changed or not) with the same rack & address
-            if len(do_IDs) > 0:
-                do_IDs = np.unique(do_IDs) # numpy array of unique changed IDs
-                done = [False]*len(do_IDs) # True for IDs which are already taken saved into a sample
-                #save_print(do_IDs)
-                for i,ID in enumerate(do_IDs):
-                    if not done[i]:
+                        if value != last: save_print("'%s' changed from %f to %f" % (key, last, value))
                         rack = get_rack(ID)
                         address = get_address(ID)
-                        sample[rack+1] = (address<<ADDR_SHIFT)
-                        for key in self.do_list: # get all bits from all channels with same rack & address
-                            _ID, last = self.do_list[key]
-                            if (get_rack(_ID) == rack) and (get_address(_ID) == address): # same rack and address, i.e. same DigitalChannels parent
-                                channel = get_channel(_ID)
-                                sample[rack+1] = sample[rack+1] | ((last & 1) << channel) # add bit
-                                # mark _ID as already added to sample. this includes _ID == ID case.
-                                # IndexError if _ID is not in list of changed channels
-                                try:
-                                    done[np.arange(len(do_IDs))[do_IDs == _ID][0]] = True
-                                except IndexError:
-                                    pass
-                                #save_print('ID 0x%x/0x%x done (value %d)' % (_ID, ID, last))
-                        data.append(sample) # save sample
+                        # TODO: units conversion? it would be good to have only one function for this!
+                        sample[rack+1] = (address<<ADDR_SHIFT)|((int((value*0x7fff) + 0.5)//10) & 0xffff)
+                        data.append(sample)
                         time += TIME_STEP
                         sample = [time] + [BIT_NOP_SH]*self.num_racks
-            # next time update only changes
-            self.first_time = False
-            # write samples to device
-            if len(data) > 0:
-                if send_data(self.sock, np.array(data,dtype=np.uint32), self.bus_rate, self.config_manual) == True:
-                    # start output
-                    result = send_recv_data(self.sock, to_client_data32(SERVER_START, 1), SOCK_TIMEOUT, output='START')
-                    if result == SERVER_ACK:
-                        # wait for completion (should be immediate)
-                        result = False
-                        while result == False:
-                            sleep(0.1)
-                            result = self.status_monitor(False)[0]
-                        # stop output
-                        send_recv_data(self.sock, SERVER_STOP, SOCK_TIMEOUT, output='STOP')
+                        self.ao_list[key] = [ID, value]
+                except KeyError: # unknown device?
+                    save_print("unknown device '%s', value %f" % (key, value))
+        # 3. for changed digital channels we have to collect all channel bits (changed or not) with the same rack & address
+        if len(do_IDs) > 0:
+            do_IDs = np.unique(do_IDs) # numpy array of unique changed IDs
+            done = [False]*len(do_IDs) # True for IDs which are already taken saved into a sample
+            #save_print(do_IDs)
+            for i,ID in enumerate(do_IDs):
+                if not done[i]:
+                    rack = get_rack(ID)
+                    address = get_address(ID)
+                    sample[rack+1] = (address<<ADDR_SHIFT)
+                    for key in self.do_list: # get all bits from all channels with same rack & address
+                        _ID, last = self.do_list[key]
+                        if (get_rack(_ID) == rack) and (get_address(_ID) == address): # same rack and address, i.e. same DigitalChannels parent
+                            channel = get_channel(_ID)
+                            sample[rack+1] = sample[rack+1] | ((last & 1) << channel) # add bit
+                            # mark _ID as already added to sample. this includes _ID == ID case.
+                            # IndexError if _ID is not in list of changed channels
+                            try:
+                                done[np.arange(len(do_IDs))[do_IDs == _ID][0]] = True
+                            except IndexError:
+                                pass
+                            #save_print('ID 0x%x/0x%x done (value %d)' % (_ID, ID, last))
+                    data.append(sample) # save sample
+                    time += TIME_STEP
+                    sample = [time] + [BIT_NOP_SH]*self.num_racks
+        # next time update only changes
+        self.first_time = False
+        # write samples to device
+        if len(data) > 0:
+            if self.simulate:
+                save_print("simulate '%s' prg. manual (%i channels)" % (self.device_name, len(data)))
+                return front_panel_values  # ok
+            else:
+                if self.sock == None:  # try to reconnect to device
+                    self.sock = init_connection("'%s' prg. manual" % self.device_name, self.con, self.config_manual)
+
+                if self.sock is not None:  # device (re-)connected
+                    save_print("'%s' prg. manual (%i channels)" % (self.device_name, len(data)))
+                    if send_data(self.sock, np.array(data,dtype=np.uint32), self.bus_rate, self.config_manual) == True:
+                        # start output
+                        result = send_recv_data(self.sock, to_client_data32(SERVER_START, 1), SOCK_TIMEOUT, output='START')
                         if result == SERVER_ACK:
-                            return front_panel_values # ok
+                            # wait for completion (should be immediate)
+                            result = False
+                            while result == False:
+                                sleep(0.1)
+                                result = self.status_monitor(False)[0]
+                            # stop output
+                            send_recv_data(self.sock, SERVER_STOP, SOCK_TIMEOUT, output='STOP')
+                            if result == SERVER_ACK:
+                                return front_panel_values # ok
 
         return False # TODO: how to indicate error?
 
@@ -3572,11 +3617,12 @@ class FPGA_Worker(Worker):
         return on error None which calls abort_transition_to_buffered
         return on success list of final values of sequence. TODO: seems not to be used anywhere?
         """
-        self.t_start = get_ticks()
-        if self.sock == None: # try to reconnect to device
-            self.sock = init_connection("'%s' to buffered"%self.device_name, self.con, self.config_manual)
-        if self.sock is None:
-            return None
+        self.t_start[0] = get_ticks()
+        if not self.simulate:
+            if self.sock == None: # try to reconnect to device
+                self.sock = init_connection("'%s' to buffered"%self.device_name, self.con, self.config_manual)
+            if self.sock is None:
+                return None
 
         #if False and self.is_primary: # test uplload table
         #    MOG_test()
@@ -3591,7 +3637,7 @@ class FPGA_Worker(Worker):
             self.final_values = from_string(group['%s_final' % device_name][0])
             #print('final values:', self.final_values)
 
-            t_read = (get_ticks()-self.t_start)*1e3
+            t_read = (get_ticks()-self.t_start[0])*1e3
 
             # use updated settings given in worker_args_ex which take precedence to worker_args.
             # however, worker_args are not overwritten, so if worker_args_ex are not anymore set, original worker_args apply.
@@ -3605,6 +3651,7 @@ class FPGA_Worker(Worker):
 
             if len(data) == 0:
                 save_print("'%s' no data!" % (self.device_name))
+                self.exp_time = self.exp_samples = self.last_time = 0
             else:
 
                 # TODO: if the data has not changed it would not need to be uploaded again?
@@ -3613,6 +3660,9 @@ class FPGA_Worker(Worker):
 
                 # save last time of data
                 self.last_time = data[-1][0]
+
+                # get expected board samples and board time. these can be different.
+                self.exp_samples, self.exp_time = get_board_samples(self.samples, self.last_time)
 
                 if not self.is_primary:
                     # secondary board: wait for start event, i.e. until primary board is reset
@@ -3639,10 +3689,13 @@ class FPGA_Worker(Worker):
 
                     # reset, configure and send data
                     # returns True on success, False on error.
-                    result = send_data(self.sock, data, self.bus_rate, config=self.config, ctrl_trg=self.ctrl_in,
-                                       ctrl_out=self.ctrl_out, reset=True,
-                                       sync_wait=self.sync_wait, sync_phase=self.sync_phase, cycles=self.num_cycles)
-                    t_data = (get_ticks() - self.t_start) * 1e3
+                    if self.simulate:
+                        result = True
+                    else:
+                        result = send_data(self.sock, data, self.bus_rate, config=self.config, ctrl_trg=self.ctrl_in,
+                                           ctrl_out=self.ctrl_out, reset=True,
+                                           sync_wait=self.sync_wait, sync_phase=self.sync_phase, cycles=self.num_cycles)
+                    t_data = (get_ticks() - self.t_start[0]) * 1e3
                     save_print('config result =', result)
                     #save_print('events =',self.events)
                     if len(self.events) > 0:
@@ -3666,13 +3719,16 @@ class FPGA_Worker(Worker):
                     # start primary board
                     # note: FPGA_worker::start_run is called from transition_to_buffered since FPGA_tab::start_run is called only for primary pseudoclock device.
                     result = self.start_run()
-                    t_start = (get_ticks() - self.t_start) * 1e3
+                    t_start = (get_ticks() - self.t_start[0]) * 1e3
                     print('start: %s (hdf %.1fms c&d %.1fms st %.1fms tot %.1fms)' % (result, t_read, t_data-t_read, t_start-t_data, t_start))
                     if result != True: return None
                 else:
                     # secondary board
                     # get status bits and check if external clock is present
-                    result = send_recv_data(self.sock, SERVER_STATUS, SOCK_TIMEOUT, output=None,
+                    if self.simulate:
+                        result = to_client_status(cmd=SERVER_STATUS_RSP, board_status=STATUS_SECONDARY_READY, board_time=0, board_samples=0)
+                    else:
+                        result = send_recv_data(self.sock, SERVER_STATUS, SOCK_TIMEOUT, output=None,
                                             recv_bytes=get_bytes(SERVER_STATUS_RSP))
                     if result is None:
                         save_print("'%s' could not get status!" % (self.device_name))
@@ -3689,16 +3745,20 @@ class FPGA_Worker(Worker):
 
                     # reset, configure and send data
                     # returns True on success, False on error.
-                    result = send_data(self.sock, data, self.bus_rate, config=self.config, ctrl_trg=self.ctrl_in,
+                    if self.simulate:
+                        result = True
+                    else:
+                        result = send_data(self.sock, data, self.bus_rate, config=self.config, ctrl_trg=self.ctrl_in,
                                        ctrl_out=self.ctrl_out, reset=True,
                                        sync_wait=self.sync_wait, sync_phase=self.sync_phase, cycles=self.num_cycles)
-                    save_print('config result =', result)
-                    # secondary board: start and wait for external trigger
-                    result = self.start_run()
+                        save_print('config result =', result)
+                    if result:
+                        # secondary board: start and wait for external trigger
+                        result = self.start_run()
 
                     # post ok for start of primary board
                     self.events[0].post(self.count, data=(get_ticks(), result))
-                    save_print("'%s' post start, result=%s (%i, %.1fms)" % (self.device_name, str(result), self.count, (get_ticks - self.t_start)*1e3))
+                    save_print("'%s' post start, result=%s (%i, %.1fms)" % (self.device_name, str(result), self.count, (get_ticks() - self.t_start[0])*1e3))
 
                     if result != True: return None
 
@@ -3711,27 +3771,31 @@ class FPGA_Worker(Worker):
         return self.abort_buffered()
     
     def abort_buffered(self):
+        # TODO: maybe just call transition_to_manual from here?
         print('abort buffered')
         self.abort = True # indicates to status_monitor to return True to stop
-        if self.sock == None:
-            save_print("worker: '%s' not connected at %s" % (self.device_name, self.con))
-            return True
+        if self.simulate:
+            return True # success
         else:
-            # stop board
-            result = send_recv_data(self.sock, SERVER_STOP, SOCK_TIMEOUT, output='STOP')
-            if result == SERVER_ACK:
-                if False:
-                    # reset board
-                    result = send_recv_data(self.sock, SERVER_RESET, SOCK_TIMEOUT, output='RESET')
-        if result is None:
-            save_print("worker: '%s' abort timeout" % (self.device_name))
-            return False  # successful aborted
-        elif result == SERVER_ACK:
-            save_print("worker: '%s' aborted ok" % (self.device_name))
-            return True  # success
-        else:
-            save_print("worker: '%s' abort error '%s'" % (self.device_name, result))
-            return False # error
+            if self.sock == None:
+                save_print("abort_buffered error: '%s' not connected at %s" % (self.device_name, self.con))
+                return True
+            else:
+                # stop board
+                result = send_recv_data(self.sock, SERVER_STOP, SOCK_TIMEOUT, output='STOP')
+                if result == SERVER_ACK:
+                    if False:
+                        # reset board
+                        result = send_recv_data(self.sock, SERVER_RESET, SOCK_TIMEOUT, output='RESET')
+            if result is None:
+                save_print("worker: '%s' abort timeout" % (self.device_name))
+                return False  # successful aborted
+            elif result == SERVER_ACK:
+                save_print("worker: '%s' aborted ok" % (self.device_name))
+                return True  # success
+            else:
+                save_print("worker: '%s' abort error '%s'" % (self.device_name, result))
+                return False # error
 
     def transition_to_manual(self):
         start = get_ticks()
@@ -3746,10 +3810,6 @@ class FPGA_Worker(Worker):
         # TODO: we check here the state and in status_monitor. it would be nice to do this in one place.
         #       maybe call status_monitor from here to get the final status?
         # TODO: unclear what to do with the final_values?
-        if self.sock == None: # this should never happen
-            save_print("'%s' not connected at %s" % (self.device_name, self.con))
-            return False
-
         all_ok = True
         if self.is_primary and len(self.events) > 0:
             # primary board: wait for all secondary boards to stop.
@@ -3767,7 +3827,13 @@ class FPGA_Worker(Worker):
 
         # all boards: stop, which might also reset board
         #result = send_recv_data(self.sock, to_client_data32(SERVER_STOP, STOP_AT_END), SOCK_TIMEOUT, output='stop')
-        result = send_recv_data(self.sock, SERVER_STOP, SOCK_TIMEOUT, output='STOP')
+        if self.simulate:
+            result = SERVER_ACK
+        elif self.sock == None:  # this should never happen
+            save_print("transition_to_manual error: '%s' not connected at %s" % (self.device_name, self.con))
+            return False
+        else:
+            result = send_recv_data(self.sock, SERVER_STOP, SOCK_TIMEOUT, output='STOP')
         if result is None:
             # for secondary boards save result in all_ok
             # for primary board result is not changed.
@@ -3778,8 +3844,6 @@ class FPGA_Worker(Worker):
             result = False
         else:
             result = True
-            # get expected board samples and board time
-            exp_samples, exp_time = get_board_samples(self.samples, self.last_time)
 
             # get board status.
             self.status_monitor(False)
@@ -3791,11 +3855,11 @@ class FPGA_Worker(Worker):
                 if (not (self.board_status & STATUS_END)) or (self.board_status & STATUS_ERROR & self.error_mask):
                     save_print("'%s' stop: board is not in end state! status=0x%x %s\n" % (self.device_name, self.board_status, aborted))
                     all_ok = False
-                elif (self.board_samples != exp_samples): # note: samples are appended with NOP to have multiple of 4
-                    save_print("'%s' stop: unexpected board samples %i != %i! %s\n" % (self.device_name, self.board_samples, exp_samples, aborted))
+                elif (self.board_samples != self.exp_samples): # note: samples are appended with NOP to have multiple of 4
+                    save_print("'%s' stop: unexpected board samples %i != %i! %s\n" % (self.device_name, self.board_samples, self.exp_samples, aborted))
                     all_ok = False
-                elif (self.board_time != exp_time):
-                    save_print("'%s' stop: unexpected board time %i != %i! %s\n" % (self.device_name, self.board_time, exp_time, aborted))
+                elif (self.board_time != self.exp_time):
+                    save_print("'%s' stop: unexpected board time %i != %i! %s\n" % (self.device_name, self.board_time, self.exp_time, aborted))
                     all_ok = False
 
                 if (self.board_status & STATUS_ERR_LOCK) and self.ignore_clock_loss:
@@ -3817,7 +3881,10 @@ class FPGA_Worker(Worker):
         else:
             # secondary boards: unlock from external clock
             data = to_config(SERVER_CONFIG, int(CONFIG_CLOCK), int(CONFIG_SCAN), self.config_manual, self.ctrl_in, self.ctrl_out, CONFIG_CYCLES, CONFIG_TRANS, STRB_DELAY, SYNC_WAIT_SINGLE, SYNC_PHASE_NONE)
-            result = send_recv_data(self.sock, data, SOCK_TIMEOUT, recv_bytes=len(data), output='STOP unlock ext. clock')
+            if self.simulate:
+                result = data
+            else:
+                result = send_recv_data(self.sock, data, SOCK_TIMEOUT, recv_bytes=len(data), output='STOP unlock ext. clock')
             if result is None: result = False
             elif len(result) == CONFIG_NUM_BYTES:
                 [cmd, clock, scan, config, ctrl_trg, ctrl_out, reps, trans, strb_delay, sync_wait, sync_phase] = from_config(result)
@@ -3857,27 +3924,30 @@ class FPGA_Worker(Worker):
 
         # return result. True = ok, False = error
         t_act = get_ticks()
-        print('transition to manual result %s (%.1fms, total %.1fms)' % (str(result), (t_act - start)*1e3, (t_act - self.t_start)*1e3))
+        print('transition to manual result %s (%.1fms, total %.1fms)' % (str(result), (t_act - start)*1e3, (t_act - self.t_start[0])*1e3))
         return result
 
     def start_run(self):
         # note: FPGA_worker::start_run is called from transition_to_buffered
-        # since FPGA_tab::start_run is called only for primary pseudoclock device,
-        # but we need to start all boards.
-        start = get_ticks()
-        if self.sock == None: # should not happen
-            save_print("'%s' not connected at %s" % (self.device_name, self.con))
+        #       since FPGA_tab::start_run is called only for primary pseudoclock device,
+        #       but we need to start all boards.
+        self.t_start[1] = get_ticks()
+        self.warn = False
+        if self.simulate:
+            result = SERVER_ACK
+        elif self.sock == None:  # should not happen
+            save_print("start_run error: '%s' not connected at %s" % (self.device_name, self.con))
+            result = None
         else:
-            self.warn = False
             result = send_recv_data(self.sock, to_client_data32(SERVER_START, self.num_cycles), SOCK_TIMEOUT, output='START')
-            if result is None:
-                save_print("'%s' start %i cycles: error starting! (timeout, %i)" % (self.device_name, self.num_cycles, self.count))
-            elif result == SERVER_ACK:
-                if self.start_trg: save_print("'%s' start %i cycles: running ... (%i, %.1fms)" % (self.device_name, self.num_cycles, self.count, (get_ticks()-start)*1e3))
-                else:              save_print("'%s' start %i cycles: waiting for trigger ... (%i, %.1fms)" % (self.device_name, self.num_cycles, self.count, (get_ticks()-start)*1e3))
-                return True
-            else:
-                save_print("'%s' start %i cycles: error starting! (%i)" % (self.device_name, self.num_cycles, self.count))
+        if result is None:
+            save_print("'%s' start %i cycles: error starting! (timeout, %i)" % (self.device_name, self.num_cycles, self.count))
+        elif result == SERVER_ACK:
+            if self.start_trg: save_print("'%s' start %i cycles: running ... (%i, %.1fms)" % (self.device_name, self.num_cycles, self.count, (get_ticks()-self.t_start[1])*1e3))
+            else:              save_print("'%s' start %i cycles: waiting for trigger ... (%i, %.1fms)" % (self.device_name, self.num_cycles, self.count, (get_ticks()-self.t_start[1])*1e3))
+            return True
+        else:
+            save_print("'%s' start %i cycles: error starting! (%i)" % (self.device_name, self.num_cycles, self.count))
         return False # error
 
     def status_monitor(self, status_end):
@@ -3890,56 +3960,67 @@ class FPGA_Worker(Worker):
               this will call transition_to_manual where we check board status and return error.
         """
         end = True
-        if self.sock == None: # should never happen
-            save_print("'%s' not connected at %s" % (self.device_name, self.con))
+        if self.simulate:
+            run_time = int((get_ticks() - self.t_start[1])*1e6)
+            if run_time >= self.exp_time:
+                samples = self.exp_samples
+                run_time = self.exp_time
+                board_status = STATUS_END
+            else:
+                samples = int(self.exp_samples * run_time / self.exp_time)
+                board_status = STATUS_RUN
+            result = to_client_status(cmd=SERVER_STATUS_RSP, board_status=board_status, board_time=run_time, board_samples=samples)
+        elif self.sock == None:  # should never happen
+            save_print("status_monitor error: '%s' not connected at %s" % (self.device_name, self.con))
             self.board_status = None
+            result = None
         else:
             result = send_recv_data(self.sock, SERVER_STATUS_IRQ, SOCK_TIMEOUT, output=None, recv_bytes=get_bytes(SERVER_STATUS_IRQ_RSP))
-            if result is None:
+        if result is None:
+            self.board_status = None
+        else:
+            #save_print('status monitor')
+            [cmd, self.board_status, self.board_time, self.board_samples] = from_client_status(result)
+            if (cmd != SERVER_STATUS_RSP) and (cmd != SERVER_STATUS_IRQ_RSP):
                 self.board_status = None
             else:
-                #save_print('status monitor')
-                [cmd, self.board_status, self.board_time, self.board_samples] = from_client_status(result)
-                if (cmd != SERVER_STATUS_RSP) and (cmd != SERVER_STATUS_IRQ_RSP):
-                    self.board_status = None
-                else:
-                    if self.board_status & STATUS_ERROR: # warning or error state
-                        if self.ignore_clock_loss and  ((self.board_status & (STATUS_RUN|STATUS_END|STATUS_ERROR)) == (STATUS_RUN|STATUS_ERR_LOCK)):
-                            # clock loss but running
-                            save_print('t %8i, # %8i, status 0x%08x clock loss (running)!' % (self.board_time, self.board_samples, self.board_status))
-                            self.warn = True
-                            if not self.abort: end = False
-                        elif self.ignore_clock_loss and ((self.board_status & (STATUS_RUN|STATUS_END|STATUS_ERROR)) == (STATUS_END|STATUS_ERR_LOCK)):
-                            # clock loss and in end state
-                            save_print('t %8i, # %8i, status 0x%08x clock loss (end)!' % (self.board_time, self.board_samples, self.board_status))
-                            self.warn = True
-                        else: # error state
-                            save_print('t %8i, # %8i, status 0x%08x error!' % (
-                            self.board_time, self.board_samples, self.board_status))
-                    elif self.board_status & STATUS_RUN:
-                        if self.board_status & STATUS_WAIT: # restart state
-                            save_print('t %8i, # %8i, status 0x%08x restart' % (self.board_time, self.board_samples, self.board_status))
-                        else: # running state
-                            save_print('t %8i, # %8i, status 0x%08x running' % (self.board_time, self.board_samples, self.board_status))
+                if self.board_status & STATUS_ERROR: # warning or error state
+                    if self.ignore_clock_loss and  ((self.board_status & (STATUS_RUN|STATUS_END|STATUS_ERROR)) == (STATUS_RUN|STATUS_ERR_LOCK)):
+                        # clock loss but running
+                        save_print('t %8i, # %8i, status 0x%08x clock loss (running)!' % (self.board_time, self.board_samples, self.board_status))
+                        self.warn = True
                         if not self.abort: end = False
-                    elif self.board_status & STATUS_END: # end state
-                        save_print('t %8i, # %8i, status 0x%08x end (%.1fms)' % (self.board_time, self.board_samples, self.board_status, (get_ticks()-self.t_start)*1e3))
-                    #elif self.board_status & STATUS_WAIT: # wait state = start trigger
-                    elif (self.board_status & STATUS_WAIT) or self.start_trg: # TODO: update firmware such it sets WAIT bit, then we do not need to check for self.start_trg!
-                        if (self.board_time == 0) and self.start_trg: # waiting for external trigger
-                            save_print('t %8i, # %8i, status 0x%08x waiting start trig.' % (self.board_time, self.board_samples, self.board_status))
-                        elif (self.board_time > 0) and is_in_stop(self.ctrl_in): # stop state
-                            if is_trg_restart(self.ctrl_in):
-                                save_print('t %8i, # %8i, status 0x%08x waiting restart trig.' % (self.board_time, self.board_samples, self.board_status))
-                            else:
-                                save_print('t %8i, # %8i, status 0x%08x stop trig. (abort)' % (self.board_time, self.board_samples, self.board_status))
-                                self.abort = True # no restart trigger is active. TODO: disable 'Repeat'?
+                    elif self.ignore_clock_loss and ((self.board_status & (STATUS_RUN|STATUS_END|STATUS_ERROR)) == (STATUS_END|STATUS_ERR_LOCK)):
+                        # clock loss and in end state
+                        save_print('t %8i, # %8i, status 0x%08x clock loss (end)!' % (self.board_time, self.board_samples, self.board_status))
+                        self.warn = True
+                    else: # error state
+                        save_print('t %8i, # %8i, status 0x%08x error!' % (
+                        self.board_time, self.board_samples, self.board_status))
+                elif self.board_status & STATUS_RUN:
+                    if self.board_status & STATUS_WAIT: # restart state
+                        save_print('t %8i, # %8i, status 0x%08x restart' % (self.board_time, self.board_samples, self.board_status))
+                    else: # running state
+                        save_print('t %8i, # %8i, status 0x%08x running' % (self.board_time, self.board_samples, self.board_status))
+                    if not self.abort: end = False
+                elif self.board_status & STATUS_END: # end state
+                    save_print('t %8i, # %8i, status 0x%08x end (%.1fms)' % (self.board_time, self.board_samples, self.board_status, (get_ticks()-self.t_start[1])*1e3))
+                #elif self.board_status & STATUS_WAIT: # wait state = start trigger
+                elif (self.board_status & STATUS_WAIT) or self.start_trg: # TODO: update firmware such it sets WAIT bit, then we do not need to check for self.start_trg!
+                    if (self.board_time == 0) and self.start_trg: # waiting for external trigger
+                        save_print('t %8i, # %8i, status 0x%08x waiting start trig.' % (self.board_time, self.board_samples, self.board_status))
+                    elif (self.board_time > 0) and is_in_stop(self.ctrl_in): # stop state
+                        if is_trg_restart(self.ctrl_in):
+                            save_print('t %8i, # %8i, status 0x%08x waiting restart trig.' % (self.board_time, self.board_samples, self.board_status))
                         else:
-                            save_print('t %8i, # %8i, status 0x%08x unexpected! (abort)\n' % (self.board_time, self.board_samples, self.board_status))
-                            self.abort = True
-                        if not self.abort: end = False
-                    else: # unexpected state
-                        save_print('t %8i, # %8i, status 0x%08x unexpected!\n' % (self.board_time, self.board_samples, self.board_status))
+                            save_print('t %8i, # %8i, status 0x%08x stop trig. (abort)' % (self.board_time, self.board_samples, self.board_status))
+                            self.abort = True # no restart trigger is active. TODO: disable 'Repeat'?
+                    else:
+                        save_print('t %8i, # %8i, status 0x%08x unexpected! (abort)\n' % (self.board_time, self.board_samples, self.board_status))
+                        self.abort = True
+                    if not self.abort: end = False
+                else: # unexpected state
+                    save_print('t %8i, # %8i, status 0x%08x unexpected!\n' % (self.board_time, self.board_samples, self.board_status))
         if status_end:
             return [end, self.get_warnings() if end else [], self.get_changed_channels()]
         else:
@@ -3986,23 +4067,27 @@ class FPGA_Worker(Worker):
     def FPGA_get_board_state(self):
         # get full board status
         #save_print('worker: get state')
-        if self.sock == None: # try to connect
-            self.sock = init_connection("'%s' get state"%self.device_name, self.con, self.config_manual)
-        if self.sock == None: # not connected
-            save_print("worker: '%s' not connected at %s" % (self.device_name, self.con))
+        if self.simulate:
+            save_print("simulated worker: '%s' ok" % (self.device_name))
+            return True
         else:
-            result = send_recv_data(self.sock, SERVER_STATUS_FULL, SOCK_TIMEOUT, recv_bytes=FPGA_STATUS_NUM_BYTES_8, output='GET_STATE')
-            if result is None:
-                save_print("worker: could not recieve status from server (timeout)")
+            if self.sock == None: # try to connect
+                self.sock = init_connection("'%s' get state"%self.device_name, self.con, self.config_manual)
+            if self.sock == None: # not connected
+                save_print("worker: '%s' not connected at %s" % (self.device_name, self.con))
             else:
-                status = FPGA_status(result)
-                if status.error == FPGA_STATUS_OK:
-                    status.show()
-                    return True
+                result = send_recv_data(self.sock, SERVER_STATUS_FULL, SOCK_TIMEOUT, recv_bytes=FPGA_STATUS_NUM_BYTES_8, output='GET_STATE')
+                if result is None:
+                    save_print("worker: could not recieve status from server (timeout)")
                 else:
-                    save_print("worker: error %d unpacking status from server" % (status.error))
-        # return error
-        return False
+                    status = FPGA_status(result)
+                    if status.error == FPGA_STATUS_OK:
+                        status.show()
+                        return True
+                    else:
+                        save_print("worker: error %d unpacking status from server" % (status.error))
+            # return error
+            return False
 
     def FPGA_disconnect(self):
         # close connection
@@ -4105,6 +4190,8 @@ class FPGA_Worker(Worker):
                 self.sync_phase = worker_args[STR_SYNC_PHASE]
             if STR_CYCLES in worker_args and worker_args[STR_CYCLES] is not None:
                 self.num_cycles = worker_args[STR_CYCLES]
+            if STR_SIMULATE in worker_args and worker_args[STR_SIMULATE] is not None:
+                self.simulate = worker_args[STR_SIMULATE]
         #print('parse worker args: done', self.worker_args)
 
 
