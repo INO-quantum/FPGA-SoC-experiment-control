@@ -1,7 +1,8 @@
 #####################################################################
 # FPGA-SoC device by Andreas Trenkwalder
-# created 6/4/2021 (heavily adapted from RFBlaster.py)
 # works as PseudoClockDevice
+# created 6/4/2021
+# last change 13/6/2024 by Andi
 #####################################################################
 
 from __future__ import generator_stop
@@ -126,12 +127,13 @@ BIT_NOP             = 31                        # no operation bit (at the momen
 BIT_STOP            = 30                        # data stop trigger bit
 BIT_TRST            = 29                        # time reset bit (not implemented)
 BIT_IRQ             = 28                        # data IRQ bit
-BIT_STRB            = 23                        # data strobe bit
-BIT_NOP_SH          = (1<<BIT_NOP)
-BIT_STOP_SH         = (1<<BIT_STOP)
-BIT_IRQ_SH          = (1<<BIT_IRQ)
-BIT_STRB_SH         = (1<<BIT_STRB)
-BIT_STRB_MASK       = np.array(~BIT_STRB_SH,dtype=np.uint32)
+BIT_STRB            = 24                        # data strobe bit
+BIT_STRB_GENERATE   = False                     # if True: generate BIT_STRB toggle bit, otherwise not
+BIT_NOP_SH          = (1 << BIT_NOP)
+BIT_STOP_SH         = (1 << BIT_STOP)
+BIT_IRQ_SH          = (1 << BIT_IRQ)
+BIT_STRB_SH         = (1 << BIT_STRB)
+BIT_STRB_MASK       = np.array(~BIT_STRB_SH, dtype=np.uint32)
 SPECIAL_BITS        = BIT_NOP_SH | BIT_STOP_SH |BIT_IRQ_SH | BIT_STRB_SH
 
 # device types (used for ID)
@@ -188,10 +190,11 @@ default_do_props = {'xcolor':'red'}
 
 # default values are inserted automatically by labscript for times before channel is used
 # these values are masked below and are not sent to boards.
-# to distingjish between user inserted values and auto-inserted we keep them outside valid range.
-SP_AUTO_VALUE = 0
-AO_AUTO_VALUE = 2*default_ao_props['min']-1.0 # TODO: with unit version this might be a valid user-inserted value!? I think nan is not possible here.
-#DO_AUTO_VALUE = 2
+# to distinguish between user inserted values and auto-inserted we keep them outside valid range.
+SP_INVALID_VALUE = 0 # special output device (virtual)
+#AO_INVALID_VALUE = 2*default_ao_props['min']-1.0 # TODO: with unit conversion this might be a valid user-inserted value!? I think nan is not possible here. maybe use np.nan?
+AO_INVALID_VALUE = np.finfo(np.float64).min # inserted automatically by labscript
+DO_INVALID_VALUE = 2 # inserted automatically by labscript
 
 # if True then primary board returns error also when a secondary board is in error state. default = False.
 stop_primary_on_secondary_error = False
@@ -1089,6 +1092,7 @@ class FPGA_PseudoClock(Pseudoclock):
     def add_device(self, device):
         if isinstance(device, ClockLine):
             save_print("%s: adding ClockLine '%s'" % (self.name, device.name))
+            parent = device.parent_device.name
             Pseudoclock.add_device(self, device)
         else:
             raise LabscriptError('%s allows only ClockLine child but you have connected %s (class %s).'%(self.name, device.name, device.__class__))
@@ -1118,7 +1122,7 @@ def time_to_str(time):
 def check_device(device, allowed_type, max_channels, device_list, shared_address):
     #check device type
     if not isinstance(device, allowed_type):
-        raise LabscriptError("device '%s', type %s must be of type %s" % (device.name, str(type(device)),str(device_typpe)))
+        raise LabscriptError("device '%s', type %s must be of type %s" % (device.name, str(type(device)), str(allowed_type)))
     # rack is always given by parent device
     rack = device.parent_device.rack
     #get address or channel
@@ -1162,7 +1166,7 @@ class SpecialOut(Output):
     address = None # has no address
     channel = None # channel = rack
     type    = TYPE_SP
-    default_value = SP_AUTO_VALUE
+    default_value = SP_INVALID_VALUE
     dtype   = np.uint32
 
     def __init__(self, name, parent_device, connection, rack, **kwargs):
@@ -1211,7 +1215,7 @@ class DigitalChannels(IntermediateDevice):
     def __init__(self, name, parent_device, connection, rack, max_channels, bus_rate=MAX_BUS_RATE, **kwargs):
         #parent device must be FPGA_board. you should not connect it directly to clockline.
         if not isinstance(parent_device, FPGA_board):
-            raise LabscriptError("Device '%s' parent class is '%s' but must be '%s'!" % (self.name, parent_device.__class__, FPGA_board))
+            raise LabscriptError("Device '%s' parent class is '%s' but must be '%s'!" % (name, parent_device.__class__, FPGA_board))
         # get clockline from FPGA_board and set as parent
         self.parent_device = parent_device.get_clockline(self, bus_rate)
         # init device with clockline as parent
@@ -1249,7 +1253,8 @@ class DigitalChannels(IntermediateDevice):
         #we use shared address from parent (DigitalChannels)
         device.rack, device.address, device.channel = check_device(device, DigitalOut, self.max_channels, self.child_devices, self.shared_address)
         device.type = TYPE_DO
-        #device.default_value = DO_AUTO_VALUE
+        device.user_default_value = device.default_value # default_value given in connection_table
+        device.default_value = DO_INVALID_VALUE # automatically inserted value by labscript
         #data save data and address bits for this channel
         device.ch_bits   = np.array((1<<device.channel) | (self.address << ADDR_SHIFT), dtype=np.uint32)
         device.addr_bits = np.array((self.address << ADDR_SHIFT), dtype=np.uint32)
@@ -1284,7 +1289,7 @@ class DigitalChannels(IntermediateDevice):
         for dev in self.child_devices:
             if (channels is None) or (dev.parent_device.rack == rack):
                 #save_print('combine DO',dev.name)
-                # first user-defined instruction (auto-inserted time=dev.t0, value=DO_AUTO_VALUE is ignored)
+                # first user-defined instruction (auto-inserted time=dev.t0, value=DO_INVALID_VALUE is ignored)
                 user_times = [key for key,value in dev.instructions.items() if isinstance(value,dict) or (key != dev.t0) or (value != dev.default_value)]
                 if channels is not None:
                     # get changing channels for all conflicts (called only when conflicts detected)
@@ -1363,7 +1368,8 @@ class AnalogChannels(IntermediateDevice):
         #each channel has its own address.
         device.rack, device.address, device.channel = check_device(device, AnalogOut, self.max_channels, self.child_devices, False)
         device.type = TYPE_AO
-        device.default_value = AO_AUTO_VALUE
+        device.user_default_value = device.default_value # default_value given in connection_table
+        device.default_value = AO_INVALID_VALUE # automatically inserted value by labscript
         #device.id = get_ID(type=device.type, rack=device.rack, address=device.address, channel=device.channel)
         device.addr_bits = np.array(device.address<<ADDR_SHIFT,dtype=np.uint32)
         IntermediateDevice.add_device(self, device)
@@ -1397,8 +1403,8 @@ class AnalogChannels(IntermediateDevice):
             chg = np.concatenate([[False], ((d[1:] - d[0:-1]) != 0)])
             # detect changes in state = True. in next lines first user-defined instruction is detected and ALWAYS executed.
             # note: labscript gives a warning when a channel state is changed at the same time twice or more. the last state is retained.
-            # first user-defined instruction (auto-inserted time=dev.t0, value=AO_AUTO_VALUE is ignored)
-            user_times = [key for key,value in dev.instructions.items() if isinstance(value,dict) or (key != dev.t0) or (value != AO_AUTO_VALUE)]
+            # first user-defined instruction (auto-inserted time=dev.t0, value=AO_INVALID_VALUE is ignored)
+            user_times = [key for key,value in dev.instructions.items() if isinstance(value,dict) or (key != dev.t0) or (value != AO_INVALID_VALUE)]
             if len(user_times) > 0:
                 #print('%s user times:' % dev.name, user_times)
                 #if channels is None: save_print("'%s' first user time %.6f" % (dev.name, round(min(user_times), TIME_ROUND_DECIMALS)))
@@ -1412,7 +1418,7 @@ class AnalogChannels(IntermediateDevice):
                 for i in index:
                     conflict_time = times[i]
                     #TODO: unit conversion?
-                    conflict_channel = [dev.name, None if (i == 0) or (dev.raw_output[i - 1] == AO_AUTO_VALUE) else dev.raw_output[i - 1], dev.raw_output[i]]
+                    conflict_channel = [dev.name, None if (i == 0) or (dev.raw_output[i - 1] == AO_INVALID_VALUE) else dev.raw_output[i - 1], dev.raw_output[i]]
                     if conflict_time in channels:
                         channels[conflict_time].append(conflict_channel)
                     else:
@@ -1446,7 +1452,7 @@ class FPGA_board(PseudoclockDevice):
     # call with name, IP address string and port string, output bus rate in Hz and num_racks (1=8 bytes/sample, 2=12 bytes/sample)
     # for all secondary boards give trigger_device=primary board.
     @set_passed_properties()
-    def __init__(self, name, ip_address, ip_port, bus_rate=MAX_BUS_RATE, num_racks=1, trigger_device=None, worker_args={}):
+    def __init__(self, name, ip_address, ip_port=DEFAULT_PORT, bus_rate=MAX_BUS_RATE, num_racks=1, trigger_device=None, worker_args={}):
         if trigger_device is not None:
             trigger_connection = 'trigger' # we have to give a connection with name 'trigger' otherwise get error.
         else:
@@ -1668,46 +1674,47 @@ class FPGA_board(PseudoclockDevice):
         #   requiring to activate the gate for each step.
         # - this needs to be called before PseudoclockDevice.generate_code, otherwise new instructions are not taken.
         # TODO: not fully tested. work in progress.
-        table_mode_channels = FPGA_board.get_table_mode_channels(self)
-        if len(table_mode_channels) > 0:
-            print('%i table mode channels found:' % len(table_mode_channels))
-            for dev in table_mode_channels:
-                if (not hasattr(dev, 'gate')) or (not hasattr(dev.parent_device, 'trigger_delay')) or (not hasattr(dev.parent_device, 'trigger_duration')):
-                    raise LabscriptError("%s error: no 'gate' defined or parent has not 'trigger_delay' or no 'trigger_duration'!" % (dev.name))
-                if len(dev.gate.instructions) > 2:
-                    raise LabscriptError("%s error: in table mode do not call enable/disable or gate.go_low/go_high but program directly frequency/amplitude/phase!" % (dev.name))
-                # get times
-                trigger_delay    = dev.parent_device.trigger_delay
-                trigger_duration = dev.parent_device.trigger_duration
-                times = []
-                if isinstance(dev, DDSQuantity):
-                    # DDS has frequency, amplitude and phase. we need the times.
-                    for child in dev.child_devices:
+        if False:
+            table_mode_channels = FPGA_board.get_table_mode_channels(self)
+            if len(table_mode_channels) > 0:
+                print('%i table mode channels found:' % len(table_mode_channels))
+                for dev in table_mode_channels:
+                    if (not hasattr(dev, 'gate')) or (not hasattr(dev.parent_device, 'trigger_delay')) or (not hasattr(dev.parent_device, 'trigger_duration')):
+                        raise LabscriptError("%s error: no 'gate' defined or parent has not 'trigger_delay' or no 'trigger_duration'!" % (dev.name))
+                    if len(dev.gate.instructions) > 2:
+                        raise LabscriptError("%s error: in table mode do not call enable/disable or gate.go_low/go_high but program directly frequency/amplitude/phase!" % (dev.name))
+                    # get times
+                    trigger_delay    = dev.parent_device.trigger_delay
+                    trigger_duration = dev.parent_device.trigger_duration
+                    times = []
+                    if isinstance(dev, DDSQuantity):
+                        # DDS has frequency, amplitude and phase. we need the times.
+                        for child in dev.child_devices:
+                            for key in child.instructions.keys():
+                                if isinstance(key, dict):
+                                    # TODO: at the moment ramps are not working here! maybe call expand_timeseries?
+                                    raise LabscriptError("%s error: at the moment no ramps are allowed for this device! use individual commands." % (dev.name))
+                            times += list(child.instructions.keys())
+                    else:
                         for key in child.instructions.keys():
                             if isinstance(key, dict):
                                 # TODO: at the moment ramps are not working here! maybe call expand_timeseries?
                                 raise LabscriptError("%s error: at the moment no ramps are allowed for this device! use individual commands." % (dev.name))
                         times += list(child.instructions.keys())
-                else:
-                    for key in child.instructions.keys():
-                        if isinstance(key, dict):
-                            # TODO: at the moment ramps are not working here! maybe call expand_timeseries?
-                            raise LabscriptError("%s error: at the moment no ramps are allowed for this device! use individual commands." % (dev.name))
-                    times += list(child.instructions.keys())
-                # get unique times and sort with increasing time.
-                times = np.unique(times)
-                if len(times) > 0:
-                    # activate gate for each time
-                    # TODO: use functions.pulse_sequence
-                    trigger_delay = 0
-                    for t in times:
-                        if (t - trigger_delay) < 0:
-                            raise LabscriptError("%s error: time %f with trigger_delay %f gives negative time %f!" % (dev.name, t, trigger_delay, t - trigger_delay))
-                        dev.gate.go_high(t - trigger_delay)
-                        dev.gate.go_low(t - trigger_delay + trigger_duration)
-                    print('%s: %i gate instructions added' % (dev.name, len(times)))
-                    print(times)
-                    print(dev.gate.instructions)
+                    # get unique times and sort with increasing time.
+                    times = np.unique(times)
+                    if len(times) > 0:
+                        # activate gate for each time
+                        # TODO: use functions.pulse_sequence
+                        trigger_delay = 0
+                        for t in times:
+                            if (t - trigger_delay) < 0:
+                                raise LabscriptError("%s error: time %f with trigger_delay %f gives negative time %f!" % (dev.name, t, trigger_delay, t - trigger_delay))
+                            dev.gate.go_high(t - trigger_delay)
+                            dev.gate.go_low(t - trigger_delay + trigger_duration)
+                        print('%s: %i gate instructions added' % (dev.name, len(times)))
+                        print(times)
+                        print(dev.gate.instructions)
 
         save_print("'%s' generating code (1) %.3fms ..." % (self.name, (get_ticks() - total_time) * 1e3))
 
@@ -1727,6 +1734,7 @@ class FPGA_board(PseudoclockDevice):
         # merge all times of all pseudoclocks and clocklines
         # times and channel.raw_data will have different lengths!
         times = np.unique(np.concatenate([pseudoclock.times[clockline] for pseudoclock in self.child_devices for clockline in pseudoclock.child_devices]))
+        exp_time = times[-1]
 
         #save_print("'%s' total %i times:\n"%(self.name,len(times)),times)
         # allocate data matrix row x column = samples x (time + data for each rack)
@@ -1770,7 +1778,7 @@ class FPGA_board(PseudoclockDevice):
                         special = True
                         continue
 
-                    if IM.shared_address:
+                    if IM.shared_address: # shared address like digital out
 
                         # collect data for all channels of IM device
                         d   = np.zeros(shape=(len(t),), dtype=np.uint32)
@@ -1796,10 +1804,10 @@ class FPGA_board(PseudoclockDevice):
                             chg[1:] |= ((d[1:] - d[:-1]) != 0)
 
                             # save last state. worker needs channel name and not device name (dev.name).
-                            # if last value is dev.default_value then channel was not changed.
-                            if dev.raw_output[-1] != dev.default_value:
-                                ID = get_ID(dev.type,dev.rack,dev.address,dev.channel)
-                                final_values[get_channel_name(ID)] = dev.raw_output[-1]
+                            # if last value is dev.default_value then channel was not changed and we return user_default_value.
+                            ID = get_ID(dev.type,dev.rack,dev.address,dev.channel)
+                            if dev.raw_output[-1] == dev.default_value: final_values[get_channel_name(ID)] = dev.user_default_value
+                            else:                                       final_values[get_channel_name(ID)] = dev.raw_output[-1]
 
                         # check conflicts with devices of different address
                         i = indices[chg]
@@ -1810,7 +1818,7 @@ class FPGA_board(PseudoclockDevice):
                         # we have to mask NOP bit from unused channels
                         data[i,IM.rack+1] = d[chg] & DATA_ADDR_MASK
                     else:
-                        # no shared address: collect data for each individual device
+                        # no shared address (like analog out): collect data for each individual device
                         for dev in IM.child_devices:
                             #if np.count_nonzero(dev.raw_output == dev.default_value) != len(t):
                             #    # print('%s instr:'%dev.name, dev.instructions)
@@ -1824,10 +1832,10 @@ class FPGA_board(PseudoclockDevice):
                             #print('%s data:' % dev.name, d)
 
                             # save last state. worker needs channel name and not device name (dev.name).
-                            # if last value is dev.default_value then channel was not changed.
-                            if dev.raw_output[-1] != dev.default_value:
-                                ID = get_ID(dev.type,dev.rack,dev.address,dev.channel)
-                                final_values[get_channel_name(ID)] = dev.raw_output[-1]
+                            # if last value is dev.default_value then channel was not changed and we return user_default_value.
+                            ID = get_ID(dev.type,dev.rack,dev.address,dev.channel)
+                            if dev.raw_output[-1] == dev.default_value: final_values[get_channel_name(ID)] = dev.user_default_value
+                            else:                                       final_values[get_channel_name(ID)] = dev.raw_output[-1]
 
                             # mark changes
                             chg = np.empty(shape=(len(t),), dtype=np.bool_)
@@ -1867,6 +1875,8 @@ class FPGA_board(PseudoclockDevice):
 
                                 # check if strobe bit is set somewhere
                                 if np.count_nonzero(d & BIT_STRB_SH) > 0:
+                                    if not BIT_STRB_GENERATE:
+                                        raise LabscriptError("Strobe bit is not generated but in your script 'SKIP' with do_not_toggle_STRB=True is called which uses this bit! Either enable generation of strobe bit (BIT_GENERATE=True) or call 'SKIP' with do_not_toggle_STRB=False to use NOP bit instead of Strobe bit.")
                                     special_STRB = True
 
                                 # take all non-default values
@@ -1931,22 +1941,22 @@ class FPGA_board(PseudoclockDevice):
                                 if info[4][i] == t:
                                     if info[0] == TYPE_DO: # digital out
                                         s2 = "0x%02x" % (info[2])
-                                        #s5 = '-' if info[5][i] == DO_AUTO_VALUE else ("low" if info[5][i]==0 else "high")
-                                        #s6 = '-' if info[6][i] == DO_AUTO_VALUE else ("low" if info[6][i]==0 else "high")
+                                        s5 = '-' if info[5][i] == DO_INVALID_VALUE else ("low" if info[5][i]==0 else "high")
+                                        s6 = '-' if info[6][i] == DO_INVALID_VALUE else ("low" if info[6][i]==0 else "high")
                                         s5 = "low" if info[5][i]==0 else "high"
                                         s6 = "low" if info[6][i]==0 else "high"
                                         s7 = ''
                                     elif info[0] == TYPE_AO: # analog out
                                         s2 = "0x%02x" % (info[2])
-                                        s5 = '-' if info[5][i] == AO_AUTO_VALUE else "%12.6f" % info[5][i]
-                                        s6 = '-' if info[6][i] == AO_AUTO_VALUE else "%12.6f" % info[6][i]
+                                        s5 = '-' if info[5][i] == AO_INVALID_VALUE else "%12.6f" % info[5][i]
+                                        s6 = '-' if info[6][i] == AO_INVALID_VALUE else "%12.6f" % info[6][i]
                                         s7 = ''
                                     elif info[0] == TYPE_SP:
                                         # special data
                                         # note: since address = None will never cause conflict but can appear with other conflicts when at same time
                                         s2 = '-'
-                                        s5 = '-' if info[5][i] == SP_AUTO_VALUE else "0x%8x" % info[5][i]
-                                        s6 = '-' if info[6][i] == SP_AUTO_VALUE else "0x%8x" % info[6][i]
+                                        s5 = '-' if info[5][i] == SP_INVALID_VALUE else "0x%8x" % info[5][i]
+                                        s6 = '-' if info[6][i] == SP_INVALID_VALUE else "0x%8x" % info[6][i]
                                         s7 = ' ignore'
                                     save_print('%35s %4i %4s %12i %12.6f %12s %12s%s'%(ch, info[1], s2, info[3][i], info[4][i], s5, s6, s7))
                         save_print()
@@ -1977,27 +1987,28 @@ class FPGA_board(PseudoclockDevice):
             data[:,rack+1][~changes[:,rack]] = BIT_NOP_SH
 
         # insert toggle strobe into data
-        if special_STRB:
-            # we do not want to toggle all data
-            for rack in range(self.num_racks):
-                mask = np.array(data[:,rack+1] & BIT_STRB_SH == 0, dtype=np.uint32)
-                if mask[0] == 0:
-                    # first sample has strobe bit set which does not work (see notes above).
-                    if data[0,0] == 0: raise LabscriptError("you have specified do_not_toggle_STRB for time = 0 which does not work! use NOP bit instead.")
-                #print(mask)
-                #print(np.cumsum(mask) & 1)
-                if False: # use XOR
-                    strb = (np.cumsum(mask) & 1) * BIT_STRB_SH
-                    data[:,rack+1] ^= np.concatenate((np.array([0],dtype=np.uint32),strb[:-1]))
-                else: # use OR and mask (TODO: check what is faster)
-                    strb = (np.cumsum(mask) & 1) * BIT_STRB_SH
-                    data[:,rack+1] = (data[:,rack+1] & BIT_STRB_MASK) | strb
-        else:
-            # toggle strobe for all data
-            if len(data) & 1 == 1: strb = np.tile(np.array([0,BIT_STRB_SH],dtype=np.uint32),reps=(len(data)+1)//2)[:-1]
-            else:                  strb = np.tile(np.array([0,BIT_STRB_SH],dtype=np.uint32),reps=len(data)//2)
-            for rack in range(self.num_racks):
-                data[:,rack+1] |= strb
+        if BIT_STRB_GENERATE:
+            if special_STRB:
+                # we do not want to toggle all data
+                for rack in range(self.num_racks):
+                    mask = np.array(data[:,rack+1] & BIT_STRB_SH == 0, dtype=np.uint32)
+                    if mask[0] == 0:
+                        # first sample has strobe bit set which does not work (see notes above).
+                        if data[0,0] == 0: raise LabscriptError("you have called 'SKIP' with do_not_toggle_STRB=True for time = 0 which does not work! use 'SKIP' with do_not_toggle_STRB=False.")
+                    #print(mask)
+                    #print(np.cumsum(mask) & 1)
+                    if False: # use XOR
+                        strb = (np.cumsum(mask) & 1) * BIT_STRB_SH
+                        data[:,rack+1] ^= np.concatenate((np.array([0],dtype=np.uint32),strb[:-1]))
+                    else: # use OR and mask (TODO: check what is faster)
+                        strb = (np.cumsum(mask) & 1) * BIT_STRB_SH
+                        data[:,rack+1] = (data[:,rack+1] & BIT_STRB_MASK) | strb
+            else:
+                # toggle strobe for all data
+                if len(data) & 1 == 1: strb = np.tile(np.array([0,BIT_STRB_SH],dtype=np.uint32),reps=(len(data)+1)//2)[:-1]
+                else:                  strb = np.tile(np.array([0,BIT_STRB_SH],dtype=np.uint32),reps=len(data)//2)
+                for rack in range(self.num_racks):
+                    data[:,rack+1] |= strb
 
         # save matrix for each board to file
         # TODO: had to add device name also to devices otherwise get error. however now we create board#_devices/board#.
@@ -2006,7 +2017,7 @@ class FPGA_board(PseudoclockDevice):
         group.create_dataset('%s_matrix' % self.name, compression=config.compression, data=data)
 
         # save final states
-        #save_print('final values:', final_values)
+        save_print('final values:', final_values)
         d = to_string(final_values)
         group.create_dataset('%s_final' % self.name, shape=(1,), dtype='S%i' % (len(d)), data=d.encode('ascii', 'ignore'))
 
@@ -2016,6 +2027,9 @@ class FPGA_board(PseudoclockDevice):
 
         # TODO: add another group with all used channels. this can be used by runviewer to avoid displaying unused channels.
         #      channels should be already saved somehow in hdf5? so maybe one can add this info for each channel there?
+
+        if self.stop_time != exp_time:
+            raise LabscriptError('%s stop time %.3e != experiment time %.3e!' % (self.stop_time, exp_time))
 
         # save stop_time and if master pseudoclock = primary board into hdf5
         # for master_pseudoclock t0 = 0
@@ -2046,11 +2060,18 @@ class FPGA_board(PseudoclockDevice):
             save_print('%s call generate code for %s' % (self.name, secondary.name))
             secondary.generate_code(hdf5_file)
 
-        save_print("'%s' generating code (5) %.3fms done.\n" % (self.name, (get_ticks() - total_time) * 1e3))
+        # experiment duration
+        if   exp_time >= 1.0:  tmp = '%.3f s'  % (exp_time)
+        elif exp_time > 1e-3:  tmp = '%.3f ms' % (exp_time * 1e3)
+        elif exp_time > 1e-6:  tmp = '%.3f us' % (exp_time * 1e6)
+        else:                  tmp = '%.1f ns' % (exp_time * 1e9)
+        save_print("'%s' generating code (5) %.3fms done. experiment duration %s." % (self.name, (get_ticks() - total_time) * 1e3, tmp))
 
     def SKIP(self, time, rack=0, do_not_toggle_STRB=False):
         "set NOP bit or do not toggle strobe bit at given time = time is waited but no output generated"
         if do_not_toggle_STRB:
+            if not BIT_STRB_GENERATE:
+                raise LabscriptError("Strobe bit is not generated but in your script 'SKIP' with do_not_toggle_STRB=True is called which uses this bit! Either enable generation of strobe bit (BIT_GENERATE=True) or call 'SKIP' with do_not_toggle_STRB=False to use NOP bit instead of Strobe bit.")
             if time == 0: raise LabscriptError("SKIP: you have specified do_not_toggle_STRB for time = 0 which is not allowed! use NOP bit instead.")
             bit = BIT_STRB_SH
         else:
@@ -2362,7 +2383,7 @@ class RunviewerClass(object):
                             #save_print('time = ',time)
                             # we add trace for all channels, even if not used
                             add_trace(name, (time, value), self, ch_name)
-                            traces[name] = (time, value)
+                            traces[name] = (time, value) # TODO: should be not needed? call only for clocklines and triggers
                             save_print("analog out '%s' (%s) %i samples %.3f - %.3fV" % (name, ch_name, len(value), np.min(value), np.max(value)))
                             if len(value) <= 20:
                                 save_print(np.transpose([time,value]))
@@ -2411,7 +2432,7 @@ class RunviewerClass(object):
                         # we add trace for all channels, even if not used
                         # add_trace(name, (time, value), parent, conn)
                         add_trace(name, (time, value), self, ch_name)
-                        traces[name] = (time, value)
+                        traces[name] = (time, value) # TODO: should be not needed? call only for clocklines and triggers
                         save_print("digital out '%s' (%s) %i samples" % (name, ch_name, len(value)))
                         if len(value) <= 2:
                             save_print(np.transpose([time,value]))
@@ -3226,32 +3247,33 @@ class FPGA_Tab(DeviceTab):
         toolpalette = toolpalettegroup.append_new_palette(FPGA_NAME)
         layout.insertWidget(1,widget)
 
-        # customize digital and analog outputs GUI appearance
-        # + close all widget group buttons
-        # + change color of digital outputs since is hardly readable
-        index = layout.count()
-        for i in range(index):
-            widget = layout.itemAt(i).widget()
-            if widget is not None:
-                # find ToolPaletteGroup with is the container class which allows to hide/unhide all outputs
-                children = widget.findChildren(ToolPaletteGroup)
-                for child in children:
-                    #if isinstance(child,ToolPaletteGroup):
-                    if AO_NAME in child._widget_groups:
-                        child.hide_palette(AO_NAME)
-                    if DO_NAME in child._widget_groups:
-                        child.hide_palette(DO_NAME)
-                    if FPGA_NAME in child._widget_groups:
-                        child.hide_palette(FPGA_NAME)
-                # change digital output text color since text is hardly readable
-                DO = widget.findChildren(DigitalOutput)
-                for do in DO:
-                    #save_print('set color of digital output', do.text())
-                    do.setToolTip(do.text())
-                    #do.setText('changed!\n')
-                    do.setStyleSheet('QPushButton {color: white; font-size: 14pt;}')
-                    #do.setStyleSheet('QPushButton {color: white; background-color: darkgreen; font-size: 14pt;} QPushButton::pressed {color: black; background-color: lightgreen; font-size: 14pt;}')
-                    #do.setStyleSheet('QPushButton {color: white; font-size: 14pt;} QPushButton::pressed {color: black; font-size: 14pt;}')
+        if True:
+            # customize digital and analog outputs GUI appearance
+            # + close all widget group buttons
+            # + change color of digital outputs since is hardly readable
+            index = layout.count()
+            for i in range(index):
+                widget = layout.itemAt(i).widget()
+                if widget is not None:
+                    # find ToolPaletteGroup with is the container class which allows to hide/unhide all outputs
+                    children = widget.findChildren(ToolPaletteGroup)
+                    for child in children:
+                        #if isinstance(child,ToolPaletteGroup):
+                        if AO_NAME in child._widget_groups:
+                            child.hide_palette(AO_NAME)
+                        if DO_NAME in child._widget_groups:
+                            child.hide_palette(DO_NAME)
+                        if FPGA_NAME in child._widget_groups:
+                            child.hide_palette(FPGA_NAME)
+                    # change digital output text color since text is hardly readable
+                    DO = widget.findChildren(DigitalOutput)
+                    for do in DO:
+                        #save_print('set color of digital output', do.text())
+                        do.setToolTip(do.text())
+                        #do.setText('changed!\n')
+                        do.setStyleSheet('QPushButton {color: white; font-size: 14pt;}')
+                        #do.setStyleSheet('QPushButton {color: white; background-color: darkgreen; font-size: 14pt;} QPushButton::pressed {color: black; background-color: lightgreen; font-size: 14pt;}')
+                        #do.setStyleSheet('QPushButton {color: white; font-size: 14pt;} QPushButton::pressed {color: black; font-size: 14pt;}')
 
         # optional worker arguments
         #save_print("'%s' worker args:" % self.device_name, self.worker_args)
@@ -3320,7 +3342,7 @@ class FPGA_Tab(DeviceTab):
 
     @define_state(MODE_BUFFERED, True)
     def start_run(self, notify_queue):
-        save_print('start run (FPGA_tab)')
+        #save_print('start run (FPGA_tab)')
         # note: this is called only for primary pseudoclock device! and not for other boards!
         #       therefore, the worker must call FPGA_worker::start_run directly from transition_to_buffered.
         #success = yield (self.queue_work(self.primary_worker, 'start_run'))
@@ -3338,8 +3360,8 @@ class FPGA_Tab(DeviceTab):
     #@define_state(MODE_BUFFERED, True)
     @define_state(MODE_MANUAL | MODE_BUFFERED | MODE_TRANSITION_TO_BUFFERED | MODE_TRANSITION_TO_MANUAL, True)
     def status_monitor(self, notify_queue):
-        # TODO: call this for all boards!
-        save_print('status monitor (FPGA_tab)')
+        # note: I could not find a way to call this for all boards!
+        #save_print('status monitor (FPGA_tab)')
         result = yield(self.queue_work(self.primary_worker, 'status_monitor', False))
         if result[0]: # end or error
             # indicate that experiment cycle is finished.
@@ -3369,31 +3391,33 @@ class FPGA_Tab(DeviceTab):
             self.warning.update(text=text)
 
         # update changed channels
+        changed = {}
         if len(changed) > 0:
             for channel, value in changed.items():
                 print(channel, 'changed to', value)
-            count = len(changed)
-            layout = self.get_tab_layout()
-            index = layout.count()
-            for i in range(index):
-                widget = layout.itemAt(i).widget()
-                if widget is not None:
+            if False: # TODO: disabled since there is some bug!
+                count = len(changed)
+                layout = self.get_tab_layout()
+                index = layout.count()
+                for i in range(index):
+                    widget = layout.itemAt(i).widget()
+                    if widget is not None:
+                        if count == 0: break
+                        DO = widget.findChildren(DigitalOutput)
+                        for do in DO:
+                            if do._DO._hardware_name in changed.keys():
+                                do.setStyleSheet('QPushButton {color: black; background-color: red; font-size: 14pt;}')
+                                do.clicked.connect(lambda: self.reset_do(do))
+                                if --count == 0: break
+                        if count == 0: break
+                        AO = widget.findChildren(AnalogOutput)
+                        for ao in AO:
+                            if ao._AO._hardware_name in changed.keys():
+                                ao._label.setStyleSheet('QLabel {color: red;}')
+                                print([ao._label.text(),ao._AO._hardware_name])
+                                ao._spin_widget.valueChanged.connect(lambda:self.reset_ao(ao))
+                                if --count == 0: break
                     if count == 0: break
-                    DO = widget.findChildren(DigitalOutput)
-                    for do in DO:
-                        if do._DO._hardware_name in changed.keys():
-                            do.setStyleSheet('QPushButton {color: black; background-color: red; font-size: 14pt;}')
-                            do.clicked.connect(lambda: self.reset_do(do))
-                            if --count == 0: break
-                    if count == 0: break
-                    AO = widget.findChildren(AnalogOutput)
-                    for ao in AO:
-                        if ao._AO._hardware_name in changed.keys():
-                            ao._label.setStyleSheet('QLabel {color: red;}')
-                            print([ao._label.text(),ao._AO._hardware_name])
-                            ao._spin_widget.valueChanged.connect(lambda:self.reset_ao(ao))
-                            if --count == 0: break
-                if count == 0: break
 
     def reset_do(self, do):
         do.setStyleSheet('QPushButton {color: white; background-color: lightgreen; font-size: 14pt;}')
@@ -3500,6 +3524,7 @@ class FPGA_Worker(Worker):
             # on error: we disconnect and set self.sock=None
             #           in program_manual and transition_to_buffered we retry
             self.sock = init_connection("'%s' init"%self.device_name, self.con, self.config_manual)
+        else: self.sock = None
         self.first_time = True
 
         # prepare zprocess events for communication between primary and secondary boards
@@ -3533,7 +3558,7 @@ class FPGA_Worker(Worker):
         sample = [time] + [BIT_NOP_SH]*self.num_racks
         do_IDs = []
         #save_print(self.do_list)
-        #save_print('final values:', self.final_values)
+        save_print('program manual final values:', self.final_values)
         #save_print('GUI   values:', front_panel_values)
         for key, value in front_panel_values.items():
             try:
@@ -3590,7 +3615,7 @@ class FPGA_Worker(Worker):
                 save_print("simulate '%s' prg. manual (%i channels)" % (self.device_name, len(data)))
                 return front_panel_values  # ok
             else:
-                if self.sock == None:  # try to reconnect to device
+                if self.sock is None:  # try to reconnect to device
                     self.sock = init_connection("'%s' prg. manual" % self.device_name, self.con, self.config_manual)
 
                 if self.sock is not None:  # device (re-)connected
@@ -3609,7 +3634,7 @@ class FPGA_Worker(Worker):
                             if result == SERVER_ACK:
                                 return front_panel_values # ok
 
-        return False # TODO: how to indicate error?
+        return False # TODO: how to indicate error? maybe return nothing?
 
     def transition_to_buffered(self, device_name, hdf5file, initial_values, fresh):
         """
@@ -3619,7 +3644,7 @@ class FPGA_Worker(Worker):
         """
         self.t_start[0] = get_ticks()
         if not self.simulate:
-            if self.sock == None: # try to reconnect to device
+            if self.sock is None: # try to reconnect to device
                 self.sock = init_connection("'%s' to buffered"%self.device_name, self.con, self.config_manual)
             if self.sock is None:
                 return None
@@ -3635,7 +3660,7 @@ class FPGA_Worker(Worker):
             #print(data.shape)
 
             self.final_values = from_string(group['%s_final' % device_name][0])
-            #print('final values:', self.final_values)
+            print('final values:', self.final_values)
 
             t_read = (get_ticks()-self.t_start[0])*1e3
 
@@ -4062,7 +4087,8 @@ class FPGA_Worker(Worker):
             send_recv_data(self.sock, SERVER_CLOSE, SOCK_TIMEOUT)
             self.sock.close()
             self.sock = None
-        save_print('worker shutdown')
+        save_print(self.device_name, 'shutdown')
+        sleep(1.0)
 
     def FPGA_get_board_state(self):
         # get full board status
