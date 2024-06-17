@@ -6,9 +6,11 @@
 // see dio24_timing_tb for simulation test bench
 // parameters:
 // - STREAM_DATA_BITS = number of bits of in_data and out_data
-// - TIME_BITS = first number of bits of in_data are used for time
-// - BUS_DATA_BITS = number of bits for bus_data
-// - BUS_ADDR_BITS = number of bits for bus_addr
+// - TIME_BITS = first number of bits of in_data are used for time (typicall)
+// - BUS_DATA_BITS = number of bits for bus_data (typically 16)
+// - BUS_ADDR_BITS = number of bits for bus_addr (typically 7 or 8)
+// - BUS_ADDR_1_USE = "ZERO" / "ADDR0" / "DATA_HIGH" = all low (default) / same as bus_addr_0 = data[23:16], data[31:24] 
+// - NUM_STRB = number of strobe bits (1 or 2)
 // - NUM_BITS  = number of bits for num_samples
 // - NUM_CTRL = numer of control bits 
 // - NUM_STATUS = number of status bits
@@ -68,8 +70,9 @@
 // bus output: assign directly to external pins!
 // - bus_data = bus data output
 // - bus_addr = bus address output
-// - bus_strb = bus strobe outut
-// - bus_enable_n = bus enable output, active low
+// - bus_strb_0 = bus strobe outut 0
+// - bus_strb_1 = bus strobe outut 1  
+// - bus_enable_n = bus enable output, active low [removed]
 // trigger output and input:
 // - trg_start_en = enable start trigger
 // - trg_start = if run and trg_start_en and positive edge on trg_start starts with execution.
@@ -141,7 +144,7 @@
 // - another option to stop streaming mode would be to allow in this case to send num_samples.
 //   however, this could be done in stream data or if we accept error_in after no data is sent.
 //   but last case needs a reset anyway, so not really useful.
-// last change 2023/01/20 by Andi
+// last change 2024/05/15 by Andi
 //////////////////////////////////////////////////////////////////////////////////
 
 module dio24_timing # (
@@ -150,10 +153,9 @@ module dio24_timing # (
     
     // data bits
     parameter integer BUS_DATA_BITS     = 16,       // 16
-    parameter integer BUS_ADDR_BITS     =  7,       // 7
-    parameter         BUS_ADDR_1_USE    = "ADDR0",  // "ADDR0" = same as bus_addr_0, otherwise set to 0.
-    //parameter         BUS_EN_0          = "LOW",    // "LOW", "HIGH" or "ACTIVE" = always low, high or changing state when running
-    //parameter         BUS_EN_1          = "LOW",    // "LOW", "HIGH" or "ACTIVE" = always low, high or changing state when running
+    parameter integer BUS_ADDR_BITS     =  8,       // 8
+    parameter         BUS_ADDR_1_USE    = "ZERO",   // "ZERO"/"ADDR0"/"DATA_HIGH" = low / same as bus_addr_0 = data[23:16], data[31:24] 
+    parameter integer NUM_STRB          = 1,        // number of bits for bus_strb (1 or 2)
     parameter integer REG_BITS          = 32,       // must be 32
     parameter integer CTRL_BITS         = 4,        // 4
     parameter integer STATUS_BITS       = 10,       // 10
@@ -168,7 +170,7 @@ module dio24_timing # (
     
     // strobe bit in address data
     parameter integer BIT_STROBE        = 23,       // strobe bit = last address bit
-    parameter         USE_STROBE        = "NO",     // "NO" = do not use strobe bit, "YES" = data output only when BIT_STROBE toggles         
+    parameter         USE_STROBE        = "NO",     // "NO" = do not use strobe bit, "YES" = data output only when BIT_STROBE toggles
 
     // synchronization
     parameter integer SYNC              = 2,        // number of synchronization stages: 2-3
@@ -185,13 +187,10 @@ module dio24_timing # (
     input [REG_BITS-1:0] num_samples,
     input [CLK_DIV_BITS-1:0] clk_div_bus,
     input [TRG_DIV_BITS-1:0] trg_div_bus,
-    input [STRB_DELAY_BITS-1:0] strb_start_0,
-    input [STRB_DELAY_BITS-1:0] strb_start_1,
-    input [STRB_DELAY_BITS-1:0] strb_end_0,
-    input [STRB_DELAY_BITS-1:0] strb_end_1,
+    input [STRB_DELAY_BITS*NUM_STRB*2-1:0] strb_delay_bus,
     //input as_start,
     input ctrl_regs_reload,                         // pulses when num_samples or clk_div is updated
-    input strb_delay_reload,                        // pulses when strb_start/end is updated
+    input strb_delay_reload,                        // pulses when strb_delay_bus is updated
     // status registers time @ clc_bus
     output [STATUS_BITS-1:0] status_bits,
     output [REG_BITS-1:0] board_time,
@@ -211,10 +210,7 @@ module dio24_timing # (
     output [BUS_DATA_BITS-1:0] bus_data,
     output [BUS_ADDR_BITS-1:0] bus_addr_0,
     output [BUS_ADDR_BITS-1:0] bus_addr_1,
-    output bus_strb_0,
-    output bus_strb_1
-    //output bus_en_0_n,
-    //output bus_en_1_n
+    output [NUM_STRB-1:0] bus_strb
     );
     
     // returns ceiling of the log base 2 of bd.
@@ -304,7 +300,7 @@ module dio24_timing # (
     // input data buffer
     // for efficiency we use buffer cycles to register BIT_NOP and BIT_STROBE if used
     // if USE_STROBE == "YES":
-    //    the first data is ALWAYS output regardless of BIT_STROBE unless BIT_MOP is set.
+    //    the first data is ALWAYS output regardless of BIT_STROBE unless BIT_NOP is set.
     //    further data is output only if BIT_STROBE toggles and BIT_NOP is not set.
     //    if BIT_NOP is set data is not output but BIT_STROBE is used to detect next toggle.
     // if USE_STROBE != "YES":
@@ -522,7 +518,7 @@ module dio24_timing # (
     localparam integer STRB_SYNC = 1;
     localparam integer BUS_SYNC  = 1; 
     reg [BUS_DATA_BITS-1:0] bus_data_buf [0 : BUS_SYNC - 1];
-    reg [BUS_ADDR_BITS-1:0] bus_addr_buf [0 : BUS_SYNC - 1];
+    reg [BUS_ADDR_BITS*2-1:0] bus_addr_buf [0 : BUS_SYNC - 1];
     //integer i;
     always @ ( posedge clk_bus ) begin
         if ( reset_bus_n == 1'b0 ) begin
@@ -534,7 +530,7 @@ module dio24_timing # (
         else if ( state_run ) begin
             if ( timeout & (~next_NOP) ) begin
                 bus_data_buf[0] <= next_data[REG_BITS+BUS_DATA_BITS-1 -: BUS_DATA_BITS];
-                bus_addr_buf[0] <= next_data[REG_BITS+BUS_DATA_BITS+BUS_ADDR_BITS-1 -: BUS_ADDR_BITS];
+                bus_addr_buf[0] <= next_data[REG_BITS+BUS_DATA_BITS+BUS_ADDR_BITS*2-1 -: BUS_ADDR_BITS*2];
                 for (i = 1; i < BUS_SYNC; i = i + 1) begin
                     bus_data_buf[i] <= bus_data_buf[i-1];
                     bus_addr_buf[i] <= bus_addr_buf[i-1];
@@ -556,80 +552,6 @@ module dio24_timing # (
             end
         end
     end
-    
-    /*
-    wire bus_en_0_n_sync;
-    if ( ( BUS_EN_0 == "LOW" ) || ( BUS_EN_0 == "HIGH" ) ) begin
-        assign bus_en_0_n_sync = 1'b0;
-    end
-    else begin 
-        reg [BUS_SYNC-1:0] bus_en_0_n_pp;
-        //integer i;
-        always @ ( posedge clk_bus ) begin
-            if ( reset_bus_n == 1'b0 ) begin
-                for (i = 0; i < BUS_SYNC; i = i + 1) begin
-                    bus_en_0_n_pp[i] <= 1'b1;
-                end
-            end
-            else if ( state_run_or_wait ) begin
-                if ( timeout & (~next_NOP) ) begin
-                    bus_en_0_n_pp[0] <= 1'b0;
-                    for (i = 1; i < BUS_SYNC; i = i + 1) begin
-                        bus_en_0_n_pp[i] <= bus_en_0_n_pp[i-1];
-                    end
-                end
-                else begin
-                    bus_en_0_n_pp[0] <= 1'b0;
-                    for (i = 1; i < BUS_SYNC; i = i + 1) begin
-                        bus_en_0_n_pp[i] <= bus_en_0_n_pp[i-1];
-                    end
-                end
-            end
-            else begin
-                for (i = 0; i < BUS_SYNC; i = i + 1) begin
-                    bus_en_0_n_pp[i] <= 1'b1;
-                end
-            end
-        end 
-        assign bus_en_0_n_sync = bus_en_0_n_pp[BUS_SYNC-1];
-    end
-
-    wire bus_en_1_n_sync;
-    if ( ( BUS_EN_1 == "LOW" ) || ( BUS_EN_1 == "HIGH" ) ) begin
-        assign bus_en_1_n_sync = 1'b0;
-    end
-    else begin 
-        reg [BUS_SYNC-1:0] bus_en_1_n_pp;    
-        //integer i;
-        always @ ( posedge clk_bus ) begin
-            if ( reset_bus_n == 1'b0 ) begin
-                for (i = 0; i < BUS_SYNC; i = i + 1) begin
-                    bus_en_1_n_pp[i] <= 1'b1;
-                end
-            end
-            else if ( state_run_or_wait ) begin
-                if ( timeout & (~next_NOP) ) begin
-                    bus_en_1_n_pp[0] <= 1'b0;
-                    for (i = 1; i < BUS_SYNC; i = i + 1) begin
-                        bus_en_1_n_pp[i] <= bus_en_1_n_pp[i-1];
-                    end
-                end
-                else begin
-                    bus_en_1_n_pp[0] <= 1'b0;
-                    for (i = 1; i < BUS_SYNC; i = i + 1) begin
-                        bus_en_1_n_pp[i] <= bus_en_1_n_pp[i-1];
-                    end
-                end
-            end
-            else begin
-                for (i = 0; i < BUS_SYNC; i = i + 1) begin
-                    bus_en_1_n_pp[i] <= 1'b1;
-                end
-            end
-        end
-        assign bus_en_1_n_sync = bus_en_1_n_pp[BUS_SYNC-1];
-    end
-    */
 
     // on timeout toggle strobe bit
     // this triggers strobe output
@@ -640,18 +562,18 @@ module dio24_timing # (
     end     
     
     //////////////////////////////////////////////////////////////////////////////////
-    // strobe generation @ clk_strb_0 and clk_strb_1 (put back to clk_bus since did not work)
-    
-    localparam integer NUM_STRB = 2;
-    
-    // combine strb_delay
+    // strobe generation @ clk_strb_0 and clk_strb_1 (have put back to clk_bus since did not work)
+        
+    // assign strb_delay
     wire [STRB_DELAY_BITS-1 : 0] strb_start [0 : NUM_STRB-1];
-    assign strb_start[0] = strb_start_0;
-    assign strb_start[1] = strb_start_1;    
     wire [STRB_DELAY_BITS-1 : 0] strb_end [0 : NUM_STRB-1];
-    assign strb_end[0] = strb_end_0;
-    assign strb_end[1] = strb_end_1;
-    
+    if (NUM_STRB == 1) begin
+        assign {strb_end[0],strb_start[0]} = strb_delay_bus;
+    end
+    else begin
+        assign {strb_end[1],strb_start[1],strb_end[0],strb_start[0]} = strb_delay_bus;
+    end
+        
     // when strobe is a toggle bit (i.e. strb_end == 0) then reset_bus_n does not reset strobe
     // this value is updated only after strb_end has been updated
     reg [NUM_STRB-1:0] strb_reset = {(NUM_STRB){1'b0}};
@@ -673,7 +595,7 @@ module dio24_timing # (
     for (genvar i = 0; i < NUM_STRB; i = i + 1)
     begin : GEN_STRB
         // strobe generation
-        // start strobe when toggle bit received out of cdc
+        // start strobe when out_strb_tgl received out of cdc
         // keep high for clk_div_strb cycles (1 cycle for clk_div_strb[i] == 0)
         reg strb_tgl = 1'b0;
         reg [CLK_DIV_BITS-1:0] strb_cnt = 0;
@@ -726,55 +648,24 @@ module dio24_timing # (
 
     // bus address
     (* IOB = "TRUE" *)
-    reg [BUS_ADDR_BITS-1:0] bus_addr_ff;
+    reg [BUS_ADDR_BITS*2-1:0] bus_addr_ff;
     always @ ( posedge clk_bus ) begin
         if ( reset_bus_n == 1'b0 ) bus_addr_ff <= 0;
         else bus_addr_ff <= bus_addr_buf[BUS_SYNC-1];
     end
-    assign bus_addr_0 = bus_addr_ff;
-    if ( BUS_ADDR_1_USE == "ADDR0" ) begin      // "ADDR0" = same as bus_addr_0, otherwise set to 0.
-        assign bus_addr_1 = bus_addr_ff;
+    assign bus_addr_0 = bus_addr_ff[BUS_ADDR_BITS-1:0]; // data bits [23:16]
+    if ( BUS_ADDR_1_USE == "ADDR0" ) begin              // "ADDR0" = same as bus_addr_0 = data bits [23:16]
+        assign bus_addr_1 = bus_addr_ff[BUS_ADDR_BITS-1:0];
     end
-    else begin
+    else if ( BUS_ADDR_1_USE == "DATA_HIGH" ) begin     // "DATA_HIGH" = use data bits [31:24]
+        assign bus_addr_1 = bus_addr_ff[BUS_ADDR_BITS*2-1 -: BUS_ADDR_BITS];
+    end
+    else begin                                          // default: "ZERO" = set all to 0
         assign bus_addr_1 = {BUS_ADDR_BITS{1'b0}};
     end
-
-    /* bus output enable buffer, active low.
-    if ( BUS_EN_0 == "LOW" ) begin
-        assign bus_en_0_n = 1'b0;
-    end
-    else if ( BUS_EN_0 == "HIGH" ) begin
-        assign bus_en_0_n = 1'b1;
-    end
-    else begin
-        (* IOB = "TRUE" *)
-        reg bus_en_0_n_out;
-        always @ ( posedge clk_bus ) begin
-            if ( reset_bus_n == 1'b0 ) bus_en_0_n_out <= 1'b1;
-            else bus_en_0_n_out <= bus_en_0_n_sync;
-        end
-        assign bus_en_0_n = bus_en_0_n_out;
-    end
-    
-    if ( BUS_EN_1 == "LOW" ) begin
-        assign bus_en_1_n = 1'b0;
-    end
-    else if ( BUS_EN_1 == "HIGH" ) begin
-        assign bus_en_1_n = 1'b1;
-    end
-    else begin
-        (* IOB = "TRUE" *)
-        reg bus_en_1_n_out;
-        always @ ( posedge clk_bus ) begin
-            if ( reset_bus_n == 1'b0 ) bus_en_1_n_out <= 1'b1;
-            else bus_en_1_n_out <= bus_en_1_n_sync;
-        end
-        assign bus_en_1_n = bus_en_1_n_out;
-    end
-    */
     
     //////////////////////////////////////////////////////////////////////////////////
-    // bus strobe 0 output buffer @ clk_strb_0 and clk_strb_1
+    // bus strobe output buffer @ clk_strb_0 and clk_strb_1
 
     (* IOB = "TRUE" *)
     reg bus_strb_ff [0 : NUM_STRB-1];
@@ -784,10 +675,9 @@ module dio24_timing # (
         always @ ( posedge clk_bus ) begin
             bus_strb_ff[i] = strb_out[i];
         end
+        assign bus_strb[i] = bus_strb_ff[i];
         
     end
-    assign bus_strb_0 = bus_strb_ff[0];
-    assign bus_strb_1 = bus_strb_ff[1];
 
     //////////////////////////////////////////////////////////////////////////////////
     // assign status bits

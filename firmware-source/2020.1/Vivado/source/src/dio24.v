@@ -8,10 +8,13 @@
 // - BITS_PER_SAMPLE = bits per sample within AXI stream. must be 64 or 96.
 // - AXI_DATA_WIDTH = AXI Lite slave bus width (must be 32)
 // - AXI_ADDR_WIDTH = AXI Lite address width. see dio24_AXI_slave.v
+// - NUM_STRB = number of strobe bits (1 or 2)
 // - FIFO_RESET_DELAY = delay for FIFO reset. >= 4 see dio24_reset.v
 // - FIFO_RESET_CYCLES = reset cycles for FIFO reset. >=5 see dio24_reset.v
 // - NUM_BUTTONS = number of buttons (must be 2)
-// - NUM_LEDS = number of LEDs (must be 2)
+// - NUM_LED_RED   = number of red LEDs (must be 2)
+// - NUM_LED_GREEN = number of green LEDs (must be 2)
+// - NUM_LED_BLUE  = number of blue LEDs (must be 2)
 // - TIME_BITS = number of bits for time (must be 32)
 // - TIME_START = LSB index of first time bit (typically 0)
 // - DATA_BITS = number of bits for data without time (must be 32)
@@ -19,7 +22,7 @@
 // - DATA_START_96_0 = LSB index of first data bit, 96bits/sample, board 0 (typically 32, i.e. right after time)
 // - DATA_START_96_1 = LSB index of first data bit, 96bits/sample, board 0 (typically 64, i.e. right after board 0 data)
 // - BUS_DATA_BITS = number of data bits (typically 16)
-// - BUS_ADDR_BITS = number of address bits (typically 7)
+// - BUS_ADDR_BITS = number of address bits (typically 8)
 // - BIT_NOP = 0-based index of bit signalling no-operation in data bits (starting at DATA_START)
 // - BIT_IRQ = 0-based index of bit signalling irq_FPGA (after TIME_BITS)
 // - BIT_NUM = 0-based index of bit signalling num_samples in data (starting at DATA_START)
@@ -75,7 +78,7 @@
 // - out_ready = external IP is ready for new data
 // - out_valid = output data is valid
 // - out_keep = output tkeep signal of STREAM_DATA_WIDTH/8 bits (all set to 1)
-// last change 2023/01/20 by Andi
+// last change 2024/05/15 by Andi
 //////////////////////////////////////////////////////////////////////////////////
 
 	module dio24 #
@@ -84,8 +87,10 @@
         parameter integer AXI_ADDR_WIDTH        = 7,        // 7: 2^7/4 = 32 registers
         parameter integer AXI_DATA_WIDTH        = 32,       // must be 32
         parameter integer STREAM_DATA_WIDTH     = 128,      // 128
-        parameter integer BUS_ADDR_BITS         = 7,        // 7
+        parameter integer BUS_ADDR_BITS         = 8,        // 8
         parameter integer BUS_DATA_BITS         = 16,       // 16
+        parameter integer NUM_STRB              = 1,        // number of bits for bus_strb (1 or 2)
+        parameter integer NUM_BUS_EN            = 1,        // number of bits for bus_en (1 or 2)
 
 	    // user-provided version and info register content
         parameter integer VERSION               = 32'h0103_2F2b, // version register 0xMM.mm_(year-2000)<<9+month<<5+day 
@@ -101,7 +106,7 @@
         // LEDs and buttons 
         parameter integer NUM_BUTTONS = 2,              // must be 2
         parameter integer NUM_LED_RED = 2,              // must be 2
-        parameter integer NUM_LED_GREEN = 3,            // must be 3
+        parameter integer NUM_LED_GREEN = 2,            // must be 2
         parameter integer NUM_LED_BLUE = 2,             // must be 2
         // bits used for blinking leds ON-time: 1=50%, 2=25%, 3=12.5%, 4=6.25%
         parameter integer LED_BLINK_ON = 3,
@@ -133,10 +138,8 @@
         parameter integer AUTO_SYNC_DELAY_BITS   = 10,               // 10
         parameter integer AUTO_SYNC_PHASE_BITS   = 12,               // 12     
 
-        // bus data and address bits without strobe bit
-        parameter         BUS_ADDR_1_USE = "ADDR0", // "ADDR0" = same as bus_addr_0, otherwise set to 0.
-        //parameter         BUS_EN_0       = "LOW",   // "LOW", "HIGH" or "ACTIVE" = always low, high or changing state when running
-        //parameter         BUS_EN_1       = "LOW",   // "LOW", "HIGH" or "ACTIVE" = always low, high or changing state when running
+        // second address bits selection
+        parameter         BUS_ADDR_1_USE = "ZERO",    // "ZERO"/"ADDR0"/"DATA_HIGH" = low / same as bus_addr_0, data[31:24] 
         
         // special data bits. they are not output on bus.
         parameter integer BIT_NOP = 31,             // must be 31. when set then data is not output on bus, but time is still running,
@@ -184,13 +187,13 @@
         output wire clk_ext_sel,                    // @ s00_axi_aclk
 
         // rack data bus output @ clk_bus
-        output wire [1:0] bus_en,
+        output wire [NUM_BUS_EN-1:0] bus_en,
         output wire [BUS_DATA_BITS-1:0] bus_data,
         output wire [BUS_ADDR_BITS-1:0] bus_addr_0,
         output wire [BUS_ADDR_BITS-1:0] bus_addr_1,
+        
         // strobe output at phase shifted clk_bus x2
-        output wire bus_strb_0,
-        output wire bus_strb_1,
+        output [NUM_STRB-1:0] bus_strb,       
         
         // irq I/O @ s00_axi_aclk
         input wire irq_TX,  // not used
@@ -584,17 +587,6 @@
         end
     end
 
-    // TODO put together with other LEDs with PWM. might be very bright!
-    localparam integer LED_BLINK_BITS = 5;
-    reg [LED_BLINK_BITS-1:0] led_blink = 0;
-    reg [1:0] led_blue_ff = 2'b0;
-    always @ ( posedge s00_axi_aclk ) begin
-        led_blink <= led_blink + 1;
-        led_blue_ff[0] <= clk_ext_locked_axi & (led_blink == 0);        // indicates external clock locked
-        led_blue_ff[1] <= clk_ext_sel        & (led_blink == 0);        // indicates external clock used
-    end 
-    assign led_blue = led_blue_ff;
-
     //////////////////////////////////////////////////////////////////////////////////    
     // CDC status registers @ clk_bus -> s00_axi_aclk
 
@@ -789,50 +781,49 @@
     localparam DIM = 1'b0;
     localparam NORM = 1'b0;
     localparam INV = 1'b1;
-    // assignment of LEDs:
-    // {ext clock (edge green), ext ok (edge green), ext error (edge red), ok (Cora green), error (Cora red)}
-    localparam NUM_LEDS = NUM_LED_RED + NUM_LED_GREEN;
+    localparam NUM_LEDS = NUM_LED_RED + NUM_LED_GREEN + NUM_LED_BLUE;
     wire [NUM_LEDS-1:0] leds_out;
-    assign led_red  [0] = leds_out[0];
-    assign led_red  [1] = leds_out[2];
-    assign led_green[0] = leds_out[1];
-    assign led_green[1] = leds_out[3];
-    assign led_green[2] = leds_out[4];
+    assign led_red  [0] = leds_out[0];  // Cora red (error)
+    assign led_red  [1] = leds_out[1];  // buffer board red (error)
+    assign led_green[0] = leds_out[2];  // Cora green (ok)
+    assign led_green[1] = leds_out[3];  // buffer board green (ok)
+    assign led_blue [0] = leds_out[4];  // Cora blue (ext clock locked)
+    assign led_blue [1] = leds_out[5];  // buffer board green or blue (ext clock locked)
     reg [NUM_LEDS - 1 : 0] leds_in;
-    reg [NUM_LEDS - 1 : 0] leds_bright = {BRIGHT,BRIGHT,BRIGHT,DIM,DIM}; // overall brightness level
+    reg [NUM_LEDS - 1 : 0] leds_bright = {DIM,BRIGHT,DIM,BRIGHT,DIM,BRIGHT}; // overall brightness level
     reg [NUM_LEDS - 1 : 0] leds_blink;
     reg [NUM_LEDS - 1 : 0] leds_high;
     reg [NUM_LEDS - 1 : 0] leds_inv;
     wire any_btn = |buttons_pwm;
     always @ ( posedge clk_pwm ) begin
         if ( (reset_sw_n_pwm == 1'b0) || (any_btn == 1'b1) ) begin // reset or any button pressed: all LEDs ON bright.
-            leds_in <= {ON,ON,ON,ON,ON};
-            leds_blink <= {CONT,CONT,CONT,CONT,CONT};     
-            leds_high <= {BRIGHT,BRIGHT,BRIGHT,BRIGHT,BRIGHT};
+            leds_in <= {ON,ON,ON,ON,ON,ON};
+            leds_blink <= {CONT,CONT,CONT,CONT,CONT,CONT};     
+            leds_high <= {BRIGHT,BRIGHT,BRIGHT,BRIGHT,BRIGHT,BRIGHT};
             leds_inv <= {NUM_LEDS{1'b0}};
         end
         else if ( error_pwm ) begin // error: red on
-            leds_in <= {clk_ext_locked_pwm,OFF,ON,OFF,ON};
-            leds_blink <= {CONT,CONT,CONT,CONT,CONT};     
-            leds_high <= {clk_ext_sel_pwm,BRIGHT,BRIGHT,BRIGHT,BRIGHT};     
+            leds_in <= {clk_ext_locked_pwm, clk_ext_locked_pwm, OFF,OFF,ON,ON};
+            leds_blink <= {CONT,CONT,CONT,CONT,CONT,CONT};     
+            leds_high <= {BRIGHT,BRIGHT,BRIGHT,BRIGHT,BRIGHT,BRIGHT};     
             leds_inv <= {NUM_LEDS{1'b0}};
         end
         else if ( run_pwm ) begin // run: green LED bright/dim toggled after each restart
-            leds_in <= {clk_ext_locked_pwm,ON,OFF,ON,OFF};
-            leds_blink <= {CONT,CONT,CONT,CONT,CONT};     
-            leds_high <= {clk_ext_sel_pwm,~restart_pwm,DIM,~restart_pwm,DIM};
+            leds_in <= {clk_ext_locked_pwm,clk_ext_locked_pwm,ON,ON,OFF,OFF};
+            leds_blink <= {CONT,CONT,CONT,CONT,CONT,CONT};     
+            leds_high <= {BRIGHT,BRIGHT,~restart_pwm,~restart_pwm,DIM,DIM};
             leds_inv <= {NUM_LEDS{1'b0}};
         end
         else if ( svr_ready | status_ready | status_end ) begin // server connected, ready for data, or end: all off
-            leds_in <= {clk_ext_locked_pwm,OFF,OFF,OFF,OFF};
-            leds_blink <= {CONT,BLINK,CONT,BLINK,CONT};     
-            leds_high <= {clk_ext_sel_pwm,BRIGHT,BRIGHT,DIM,DIM};     
+            leds_in <= {clk_ext_locked_pwm,clk_ext_locked_pwm,OFF,OFF,OFF,OFF};
+            leds_blink <= {CONT,CONT,CONT,CONT,CONT,CONT};     
+            leds_high <= {BRIGHT,BRIGHT,BRIGHT,BRIGHT,BRIGHT,BRIGHT};     
             leds_inv <= {NUM_LEDS{1'b0}};
         end
         else begin // waiting for server to connect: all on
-            leds_in <= {clk_ext_locked_pwm,ON,ON,ON,ON};
-            leds_blink <= {CONT,CONT,CONT,CONT,CONT};     
-            leds_high <= {clk_ext_sel_pwm,BRIGHT,BRIGHT,DIM,DIM};     
+            leds_in <= {clk_ext_locked_pwm,clk_ext_locked_pwm,ON,ON,ON,ON};
+            leds_blink <= {CONT,CONT,CONT,CONT,CONT,CONT};     
+            leds_high <= {BRIGHT,BRIGHT,BRIGHT,BRIGHT,DIM,DIM};     
             leds_inv <= {NUM_LEDS{1'b0}};
         end
     end
@@ -866,6 +857,18 @@
         .leds_high(leds_high),
         .leds_inv(leds_inv)
         );
+
+    /* TODO put together with other LEDs with PWM. might be very bright!
+    localparam integer LED_BLINK_BITS = 5;
+    reg [LED_BLINK_BITS-1:0] led_blink = 0;
+    reg [1:0] led_blue_ff = 2'b0;
+    always @ ( posedge s00_axi_aclk ) begin
+        led_blink <= led_blink + 1;
+        led_blue_ff[0] <= clk_ext_locked_axi & (led_blink == 0);        // indicates external clock locked
+        led_blue_ff[1] <= clk_ext_sel        & (led_blink == 0);        // indicates external clock used
+    end 
+    assign led_blue = led_blue_ff;
+    */
 
     //////////////////////////////////////////////////////////////////////////////////    
     // AXI Lite bus @ s00_axi_aclk
@@ -1519,14 +1522,11 @@
 
 	//////////////////////////////////////////////////////////////////////////////////
     // synchronize strobe clock division and delay @ clk_bus
-    
-    localparam integer NUM_STRB = 2;
-    
+        
     wire strb_delay_reload; // pulses when strobe_delay is updated @ clk_bus
     
     // synchronized outputs
-    wire [STRB_DELAY_BITS-1:0] strb_start [0 : NUM_STRB-1];
-    wire [STRB_DELAY_BITS-1:0] strb_end   [0 : NUM_STRB-1];
+    wire [STRB_DELAY_BITS*NUM_STRB*2-1:0] strb_delay_bus;
     
     reg valid = 1'b0;
     wire ready;
@@ -1550,7 +1550,7 @@
         .in_ready(ready),
         .out_clock(clk_bus),
         .out_reset_n(reset_bus_n),
-        .out_data({strb_end[1],strb_start[1],strb_end[0],strb_start[0]}),
+        .out_data(strb_delay_bus),
         .out_valid(strb_delay_reload),
         .out_ready(1'b1)                        // always ready
     );    
@@ -1677,8 +1677,7 @@
         .BUS_DATA_BITS(BUS_DATA_BITS),
         .BUS_ADDR_BITS(BUS_ADDR_BITS),
         .BUS_ADDR_1_USE(BUS_ADDR_1_USE),
-        //.BUS_EN_0(BUS_EN_0),
-        //.BUS_EN_1(BUS_EN_1),
+        .NUM_STRB(NUM_STRB),
         .REG_BITS(AXI_DATA_WIDTH),
         .CTRL_BITS(TIMING_CTRL_BITS),
         .STATUS_BITS(TIMING_STATUS_BITS),
@@ -1702,12 +1701,9 @@
         .num_samples(num_samples_bus),
         .clk_div_bus(clk_div_bus),
         .trg_div_bus(trg_div_bus),
-        .strb_start_0(strb_start[0]),
-        .strb_start_1(strb_start[1]),
-        .strb_end_0(strb_end[0]),
-        .strb_end_1(strb_end[1]),
+        .strb_delay_bus(strb_delay_bus),
         .ctrl_regs_reload(ctrl_regs_reload_bus),        // pulses when num_samples or clk_div is updated
-        .strb_delay_reload(strb_delay_reload),          // pulses when strb_start/end is updated
+        .strb_delay_reload(strb_delay_reload),          // pulses when strb_delay_bus is updated
         //.trg_start(trg_start_bus),
         //.as_start(as_start_bus),
         // status bits and board time & samples
@@ -1729,10 +1725,7 @@
         .bus_data(bus_data),
         .bus_addr_0(bus_addr_0),
         .bus_addr_1(bus_addr_1),
-        .bus_strb_0(bus_strb_0),
-        .bus_strb_1(bus_strb_1)
-        //.bus_en_0_n(bus_en_0_n),
-        //.bus_en_1_n(bus_en_1_n)
+        .bus_strb(bus_strb)
     );
         
     wire [4*AUTO_SYNC_TIME_BITS-1:0] sync_time_det;
@@ -1954,7 +1947,14 @@
 end
     end
     assign ext_out = ext_out_ff;
-    assign bus_en  = bus_en_ff;
+    
+    if (NUM_BUS_EN == 1) begin
+        assign bus_en[0]  = bus_en_ff[0];
+    end
+    else begin
+        assign bus_en  = bus_en_ff;
+    end
+    
     
 	//////////////////////////////////////////////////////////////////////////////////
     // RX FIFO @ clk_bus -> AXIS_out_aclk 
