@@ -15,6 +15,9 @@
 // - NUM_LED_RED   = number of red LEDs (must be 2)
 // - NUM_LED_GREEN = number of green LEDs (must be 2)
 // - NUM_LED_BLUE  = number of blue LEDs (must be 2)
+// - INV_RED       = bit pattern for each red LED, 0 = normal, 1 = inverted.
+// - INV_GREEN     = bit pattern for each green LED, 0 = normal, 1 = inverted.
+// - INV_BLUE      = bit pattern for each blue LED, 0 = normal, 1 = inverted.
 // - TIME_BITS = number of bits for time (must be 32)
 // - TIME_START = LSB index of first time bit (typically 0)
 // - DATA_BITS = number of bits for data without time (must be 32)
@@ -78,7 +81,7 @@
 // - out_ready = external IP is ready for new data
 // - out_valid = output data is valid
 // - out_keep = output tkeep signal of STREAM_DATA_WIDTH/8 bits (all set to 1)
-// last change 2024/05/15 by Andi
+// last change 2024/07/29 by Andi
 //////////////////////////////////////////////////////////////////////////////////
 
 	module dio24 #
@@ -104,10 +107,13 @@
         parameter integer NUM_OUT_BITS = 3,         // number of external outputs
                 
         // LEDs and buttons 
-        parameter integer NUM_BUTTONS = 2,              // must be 2
-        parameter integer NUM_LED_RED = 2,              // must be 2
-        parameter integer NUM_LED_GREEN = 2,            // must be 2
-        parameter integer NUM_LED_BLUE = 2,             // must be 2
+        parameter integer NUM_BUTTONS   = 2,        // must be 2
+        parameter integer NUM_LED_RED   = 2,        // must be 2
+        parameter integer NUM_LED_GREEN = 2,        // must be 2
+        parameter integer NUM_LED_BLUE  = 2,        // must be 2
+        parameter         INV_RED       = 2'b00,    // bit for each LED
+        parameter         INV_GREEN     = 2'b00,    // bit for each LED
+        parameter         INV_BLUE      = 2'b00,    // bit for each LED
         // bits used for blinking leds ON-time: 1=50%, 2=25%, 3=12.5%, 4=6.25%
         parameter integer LED_BLINK_ON = 3,
         // bits used for blinking leds
@@ -789,42 +795,42 @@
     assign led_green[1] = leds_out[3];  // buffer board green (ok)
     assign led_blue [0] = leds_out[4];  // Cora blue (ext clock locked)
     assign led_blue [1] = leds_out[5];  // buffer board green or blue (ext clock locked)
-    reg [NUM_LEDS - 1 : 0] leds_in;
-    reg [NUM_LEDS - 1 : 0] leds_bright = {DIM,BRIGHT,DIM,BRIGHT,DIM,BRIGHT}; // overall brightness level
-    reg [NUM_LEDS - 1 : 0] leds_blink;
-    reg [NUM_LEDS - 1 : 0] leds_high;
-    reg [NUM_LEDS - 1 : 0] leds_inv;
+    reg  [NUM_LEDS - 1 : 0] leds_in;
+    reg  [NUM_LEDS - 1 : 0] leds_bright = {DIM,BRIGHT,DIM,BRIGHT,DIM,BRIGHT}; // overall brightness level
+    reg  [NUM_LEDS - 1 : 0] leds_blink;
+    reg  [NUM_LEDS - 1 : 0] leds_high;
+    wire [NUM_LEDS - 1 : 0] leds_inv    = {INV_BLUE,INV_GREEN,INV_RED};
     wire any_btn = |buttons_pwm;
     always @ ( posedge clk_pwm ) begin
         if ( (reset_sw_n_pwm == 1'b0) || (any_btn == 1'b1) ) begin // reset or any button pressed: all LEDs ON bright.
             leds_in <= {ON,ON,ON,ON,ON,ON};
             leds_blink <= {CONT,CONT,CONT,CONT,CONT,CONT};     
             leds_high <= {BRIGHT,BRIGHT,BRIGHT,BRIGHT,BRIGHT,BRIGHT};
-            leds_inv <= {NUM_LEDS{1'b0}};
+            //leds_inv <= {NUM_LEDS{1'b0}};
         end
         else if ( error_pwm ) begin // error: red on
             leds_in <= {clk_ext_locked_pwm, clk_ext_locked_pwm, OFF,OFF,ON,ON};
             leds_blink <= {CONT,CONT,CONT,CONT,CONT,CONT};     
             leds_high <= {BRIGHT,BRIGHT,BRIGHT,BRIGHT,BRIGHT,BRIGHT};     
-            leds_inv <= {NUM_LEDS{1'b0}};
+            //leds_inv <= {NUM_LEDS{1'b0}};
         end
         else if ( run_pwm ) begin // run: green LED bright/dim toggled after each restart
             leds_in <= {clk_ext_locked_pwm,clk_ext_locked_pwm,ON,ON,OFF,OFF};
             leds_blink <= {CONT,CONT,CONT,CONT,CONT,CONT};     
             leds_high <= {BRIGHT,BRIGHT,~restart_pwm,~restart_pwm,DIM,DIM};
-            leds_inv <= {NUM_LEDS{1'b0}};
+            //leds_inv <= {NUM_LEDS{1'b0}};
         end
         else if ( svr_ready | status_ready | status_end ) begin // server connected, ready for data, or end: all off
             leds_in <= {clk_ext_locked_pwm,clk_ext_locked_pwm,OFF,OFF,OFF,OFF};
             leds_blink <= {CONT,CONT,CONT,CONT,CONT,CONT};     
             leds_high <= {BRIGHT,BRIGHT,BRIGHT,BRIGHT,BRIGHT,BRIGHT};     
-            leds_inv <= {NUM_LEDS{1'b0}};
+            //leds_inv <= {NUM_LEDS{1'b0}};
         end
         else begin // waiting for server to connect: all on
             leds_in <= {clk_ext_locked_pwm,clk_ext_locked_pwm,ON,ON,ON,ON};
             leds_blink <= {CONT,CONT,CONT,CONT,CONT,CONT};     
             leds_high <= {BRIGHT,BRIGHT,BRIGHT,BRIGHT,DIM,DIM};     
-            leds_inv <= {NUM_LEDS{1'b0}};
+            //leds_inv <= {NUM_LEDS{1'b0}};
         end
     end
     
@@ -1712,7 +1718,10 @@
         .board_samples(board_samples_bus),
         .board_time_ext(board_time_ext_bus),
         .board_samples_ext(board_samples_ext_bus),
-        .status_update(),                               // not used
+        .status_update(), // not used
+        // next data out of input buffer (not used)
+        .next_data(),
+        .next_reload(),
         // TX stream data input
         .in_data({in_last_bus,in_data_bus}),
         .in_valid(in_valid_bus),
