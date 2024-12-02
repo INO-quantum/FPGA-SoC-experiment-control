@@ -16,3 +16,17 @@ The default IP addresses of the primary boards for buffer board version v1.2, v1
 > You cannot use the same firmware for different boards since each board must have its unique Ethernet MAC address. This is hard-coded in the firmware. You might experience random connection problems when two boards have the same MAC address. If you need more than one secondary board, or if you experience problems please contact me.
 
 
+## Florence
+
+This folder contains the releases for the Florence (and Trieste) designs.
+
+## Innsbruck
+
+This folder contains the releases for the Innsbruck design which is similar but not identical to the standard Florence design.
+
+## preliminary
+
+This folder contains preliminary developments versions used for testing where not everything might be working.
+
+
+
