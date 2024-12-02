@@ -26,8 +26,7 @@ Below an outline of the project structure. See readme files in the individual fo
 │   ├── v1.3                board version v1.3
 │   └── v1.4                board version v1.4
 ├── documentation           manual and other documentation
-│   ├── manual              manual
-│   └── server.config       configuration file
+│   └── manual              manual
 └── paper                   publication
     ├── data                data used for publication
     └── schematics          cable driver schematics
@@ -106,9 +105,9 @@ The FPGA-SoC replaces the DIO64 card but also improves the old system in several
   * the current bus hardware layout with the "strobe" signal instead of a real clock limits the output rate
   * the internal 100MHz bus clock of the board limits the output rate to 50MHz. a bus clock of 200MHz might be possible at the cost of higher latency and more resources used. individual I/O ports I have tested to run with 1GHz using parallel-to-serial and serial-to-parallel decoders (SERDES) on the chip but I think its not possible to use this on many port.
 
-## next 2025 version
+## next version in early 2025
 
-I am working on a new major update which is planned to be released beginning of 2025. All present features are maintained but it will feature (mainly internal) improvements with respect to the present one which will reduce resource usage and improve timing constraints. This is needed for future updates. It will add new features as the contiguous strobe requested by users. It will again support 20MHz output bus rate, which was broken with some update in the past. The "cycling mode" will be finally fully supported (at least thats planned) and a wide choice of programmable I/O signals are already implemneted with a (simple) conditional logic triggering system. The old auto-sync will be retired and is replaced with a simpler synchronization scheme - these changes are transparent to the user such that the old functionality is maintained. A first preliminary version is/will be available in the folder [preliminary version](/firmware_release/preliminary) but use it only after my feedback.
+I am working on a new major update which is planned to be released beginning of 2025. All present features are maintained but it will feature (mainly internal) improvements with respect to the present one which will reduce resource usage and improve timing constraints. This is needed for future updates. It will add new features as the contiguous strobe requested by users. It will again support 20MHz output bus rate, which was broken with some update in the past. The "cycling mode" will be finally fully supported (at least thats planned) and a wide choice of programmable I/O signals are already implemneted with a (simple) conditional logic triggering system. The old auto-sync will be retired and is replaced with a simpler synchronization scheme - these changes are transparent to the user such that the old functionality is maintained. A first preliminary version is/will be available in the folder [preliminary version](/firmware_release/preliminary) but use it only after iteracting with me.
 
 
 
