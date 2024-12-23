@@ -219,7 +219,7 @@ Each of these commands opens a configuration menu where you can change the setti
 - There are two jumpers on the board, one for the power supply (near the jack) needs to be set to EXT or USB depending if you power from the jack (2.1-2.5mm center-positive) or via the USB plug. The second jumper should be shortened in order to boot from SD card.
 - About 1s after switching on the power a yellow or green LED should switch on in addtion to the red power LED. This indicates the bitstream was written to the FPGA part. If this is not the case then either the SD card is not properly inserted or corrupt, or the bitstream is for a different board. Check that the sticker on the FPGA-SoC chip reads "10" for the Cora-Z7-10 board or "7S" for the Cora-Z7-07S board and choose the proper firmware for the board. I had problems with low-quality SD cards which broke after only one month of usage although the board only reads the SD card and does not write (user software can also write to it when needed).
 - For debugging one can connect a micro-USB cable on the board and monitor in the console the boot process and navigate in the file system: I use `minicom` (any other terminal program should work) with 115200/8/N/1 settings and Hardware flow control disabled. The board appears usally as `ttyUSB1` (and `ttyUSB3` when a second board should be monitored on the same computer). When a terminal program is connected, sometimes the board boots accidently into the `Zynq>` console, then enter: `boot` or push the `SRST` button and the board should boot again. After booting is completed enter as user `root` and password `root` to navigate in the linux file system. 
-- In the console use `dmesg` to output the kernel log file which can be very valuable. You should see an output at the end of the logfile similar to the one below. In case the board is booting but the `dma24` driver is not associated as DMA driver, then you should see in the boot log that a Xilinx DMA/DMAS/PL330 device driver was loaded. In order to deactivate them use `petalinux-config -c kernel` and in `Device Drivers` disable entire section `DMA Engine support` or go inside and disable any Xilinx DMA driver like `Xilinx AXI DMAS engine`, `Xilinx DMA engines` or `DMA API driver Driver for PL330`. Possibly, you need also to disable `Xilinx DRM KMS Driver` in the `Graphics Support` section of `Device Drivers`, but this might not be needed when `Multimedia support` is disabled - which I usually do among other unnessessary drivers in order to have the `image.ub` file small. Ensure also that in `petalinux-config -c rootfs`, section `apps` has `fpga-init`, `fpga-server` and `fpga-test` enabled, and section `modules` has `dio24` enabled. After rebooting (you can type `reboot` in the console) check that none of the Xilinx DMA drivers appear in the boot log and that the `dio24` driver is mapped on 3 devices (dma24, dio24, xadc_wiz) and 3 irq's (2x for dma24, 1x for dio24 and none for xadc_wiz) as in the following output:
+- In the console you should see an output as below during booting. You can use also `dmesg` to output the kernel log file which can be very valuable, but it contains only the driver entries, i.e. the `fpga-init`, `FPGA-master` and `FPGA-server` entries are missing. In case the board is booting but the `dma24` driver is not associated as DMA driver, then you should see in the boot log that a `Xilinx DMA/DMAS/PL330` device driver was loaded instead. In order to deactivate them use `petalinux-config -c kernel` and in `Device Drivers` disable entire section `DMA Engine support` or go inside and disable any Xilinx DMA driver like `Xilinx AXI DMAS engine`, `Xilinx DMA engines` or `DMA API driver Driver for PL330`. Possibly, you need also to disable `Xilinx DRM KMS Driver` in the `Graphics Support` section of `Device Drivers`, but this might not be needed when `Multimedia support` is disabled - which I usually do among other unnessessary drivers in order to have the `image.ub` file small. Ensure also that in `petalinux-config -c rootfs`, section `apps` has `fpga-init`, `fpga-server` and `fpga-test` enabled, and section `modules` has `dio24` enabled. After rebooting (you can type `reboot` in the console) check that none of the Xilinx DMA drivers appear in the boot log and that the `dio24` driver is mapped on 3 devices (dma24, dio24, xadc_wiz) and 3 irq's (2x for dma24, 1x for dio24 and none for xadc_wiz) as in the following output:
 
 ```
 dio24: loading out-of-tree module taints kernel.
@@ -250,51 +250,55 @@ DIOhlp pid 146 (dio24helper) waiting for IRQ ...
 
 fpga-init v1.1 by Andi
 fpga-init: mounting SD card on /mnt/sd/
-fpga-init: info     = Cora-Z7-07S v1.3 sec. 192.168.1.131
-fpga-init: IP       = 192.168.1.131
+fpga-init: info     = Cora-Z7-07S v1.3 prim. 192.168.1.130 (IBK)
+fpga-init: IP       = 192.168.1.130 (static)
+fpga-init: netmask  = 255.255.255.0 (set by server)
 fpga-init: port     = <default>
+fpga-init: clk_div  = 100
+fpga-init: ctrl_in  = [0x0,0x0]
+fpga-init: ctrl_out = [0x26482,0x848e]
 fpga-init: strobe 0 = 30:40:30:1
 fpga-init: strobe 1 = 29:40:31:1
-fpga-init: primary  = 2
-fpga-init: CPUs     = <default>
+fpga-init: primary  = 1
+fpga-init: CPUs     = 1
 fpga-init: wait     = 0
-fpga-init: phase    = 0x1c308c
+fpga-init: phase    = <default>
 fpga-init: unmounting SD card
-fpga-init: IP address = 192.168.1.131, net mask = 255.255.255.0 (set by server)
-fpga-init: create dio24dev device node (246)
-fpga-init: create dma24dev device node (245)
+fpga-init: create dio24dev device node (247)
+fpga-init: create dma24dev device node (246)
 fpga-init: starting fpga-server ...
 fpga-init: done
 
 ...
 
 FPGA server v1.0 by Andi
-FPGA-master: number CPU 2
+FPGA-master: ctrl_in = [0x0,0x0]
+FPGA-master: ctrl_out = [0x26482,0x848e]
+FPGA-master: number CPU 1
 FPGA-master: sync wait time 0
-FPGA-master: sync phase 0x1c308c
+FPGA-master: sync phase 0x0
 FPGA-master: strobe delay 0x441d451e
 actual flags 0x1002 (need 0x1)
 FPGA-master:  'eth0' not ready ...
-actual flags 0x1003 (ok), IP '192.168.1.131'
-new    flags 0x1003 (ok),+-----------------------------+
-FPGA-master: 'eth0' ready|                             |e open <fpga-server> (4)
-131' set ok.             |  Cannot open /dev/ttyUSB1!  |
-FPGA-master: start server|                             |
-FPGA-master: servDIOio  d+-----------------------------+
-er is starting ...
+get IP (1) failed. flags = 0x1003, errno = 99 (ok with DHCP)
+new    flags 0x1003 (ok), IP '192.168.1.130'
+FPGA-master: 'eth0' ready and IP '192.168.1.130' set ok.
+FPGA-master: start server ...
+FPGA-master: server is starting ...
 FPGA-server: listening at localhost:49701
-HELPER: running ...
-DIOio  device release <fpga-server> (477)
+FPGA-server: set_div 100 ok
+FPGA-server: set strobe delay 0x441d451e ok
+FPGA-server: set wait time 0 ok
+FPGA-server: OUT_CONFIG actual config f08070 (0)
+FPGA-server: set ctrl_in/out 0x0/0/26482/848e (ok)
 FPGA-server: startup ok.
-DIOdma device release <fpga-server> (477)
 FPGA-master: server start succeeded
-FPGA-server: 127.0.0.1:42316 connected (local)
-FPGA-master: connection to localhost:49701 ok (port 42316)
+FPGA-master: connection to localhost:49701 ok (port 41048)
 
 master: hit <ESC> or 'X' to shutdown server ...
 
+FPGA-server: 127.0.0.1:41048 connected (local)
 
 ```
-
 
 
