@@ -78,6 +78,11 @@ If you want to generate the firmware for another buffer board, you have to enabl
 
 4. Now you can regenerate the .xsa file as described above. If it gives an error look in the `Messages` tab what is the reason. Most likely the name of one of the ports is wrong. Open the selected constraint .xdc file and search for `clk_in` and give the ports on the Block Diagram the exact same name as in the .xdc (or vice versa). The port name can be changed by changing the `Name` entry in `External Port Properties`. 
 
+
+> [!Note]
+> If you have created the project using the tcl scripts, then modifying the top design might create an error that design_1_wrapper.v uses external ports which should have been deleted. This is a known bug in Vivado 2020.1 where modifications in design_1.bd are not automatically updated in design_1_wrapper.v. In this case you need (1) to create a new HDL wrapper and afterwards (2) disable and then (3) delete the old design_1_wrapper.v. The reason is that design_1_wrapper.v is copied by the tcl script into the wrong folder (`<project>/sources_1/imports/hdl/` instead of `<project>/sources_1/bd/design_1/hdl/`). My latest tcl's should not have this problem, but the older ones might require this manual fix. In case of problems let me know.
+
+
 ## Software implementation
 
 Petalinux is a simple Linux distribution which allows to run an embedded Linux operating system on the CPU part of the FPGA-SoC chip. The original board support package (.bsp) and demos are from [Digilent](https://reference.digilentinc.com/reference/software/petalinux/start) and require Petalinux 2017.4 installed on a Linux operating system. The present project works with Vivado and Petalinux 2020.1 on Ubuntu 20.04 LTS[^1]. For the installation of Petalinux 2020.1 please consult the [Petalinux Tools guide from Xilinx](https://docs.xilinx.com/v/u/2020.1-English/ug1144-petalinux-tools-reference-guide). More condensed information (maybe not fully up-to-date) can be obtained from [Cora-Z7-07S Petalinux BSP Project from Digilent](https://github.com/Digilent/Petalinux-Cora-Z7-07S/blob/master/README.md). The guides use the recommended installation folder /opt/pkg/petalinux[^2].
