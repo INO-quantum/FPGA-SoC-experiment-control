@@ -1,0 +1,8 @@
+#Note: Mention Each package in individual line
+#These packages will get added into rootfs menu entry
+
+CONFIG_dio24
+
+CONFIG_fpga-init
+CONFIG_fpga-server
+CONFIG_fpga-test

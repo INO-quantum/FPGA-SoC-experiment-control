@@ -1,0 +1,239 @@
+#!/bin/sh
+# last change 2023/09/30 by Andi
+
+echo "fpga-init v1.1 by Andi"
+
+#default IP address
+INET="192.168.1.130"
+MASK="255.255.255.0"
+
+#device names
+device0="dio24dev"
+device1="dma24dev"
+
+#SD card mounting point
+SD="/dev/mmcblk0p1"
+mnt="/mnt/sd/"
+
+#configuration file
+config="server.config"
+str_info="info"
+str_IP="IP"
+str_port="port"
+str_clk_div="clk_div"
+str_ctrl_in="ctrl_in"
+str_ctrl_out="ctrl_out"
+str_strb0="strobe_0"
+str_strb1="strobe_1"
+str_prim="primary"
+str_cpus="CPUs"
+str_wait="wait"
+str_phase="phase"
+
+#files and folders to remove from SD card
+svi="System Volume Information"
+result="result.csv"
+steps="steps.csv"
+
+echo "fpga-init: mounting SD card on $mnt"
+mkdir $mnt
+mount $SD $mnt
+
+#if file exists then read information
+if [ -f $mnt$config ]; then
+
+#print info line
+info=`awk -F'=' "\\$1==\"$str_info\" {print \\$2}" $mnt$config`
+if [ "$info" != "" ]; then
+echo "fpga-init: info     = $info"
+fi
+
+#read IP address
+IP=`awk -F'=' "\\$1==\"$str_IP\" {print \\$2}" $mnt$config`
+if [ "$IP" = "" ]; then
+opt_IP="-I $INET"
+echo "fpga-init: IP       = $INET <default>"
+else 
+    if [ "$IP" == "DHCP" ]; then
+    # set dynamic IP address via DHCP
+    # if the kernel is configured already with DHCP we do not need to do anything.
+    echo "fpga-init: leaving dynamic IP address (DHCP)"
+    # this does not work. dhclient not recoginzed. petalinux uses udhcpc.
+    #ifconfig eth0 0.0.0.0 0.0.0.0 && dhclient
+    #ifconfig interface dhcp status
+    opt_IP=""
+    else 
+    # set static IP address. 
+    # this can be done only after eth0 is configured, so we do it in server.
+    echo "fpga-init: IP       = $IP (static)"
+    echo "fpga-init: netmask  = $MASK (set by server)"
+    #ifconfig eth0 inet $new_IP netmask $MASK up
+    opt_IP="-I $IP"
+    fi
+fi
+
+#read optional server port
+port=`awk -F'=' "\\$1==\"$str_port\" {print \\$2}" $mnt$config`
+if [ "$port" == "" ]; then
+opt_port=""
+echo "fpga-init: port     = <default>"
+else
+opt_port="-P $port"
+echo "fpga-init: port     = $port"
+fi
+
+#read optional clock div
+clk_div=`awk -F'=' "\\$1==\"$str_clk_div\" {print \\$2}" $mnt$config`
+if [ "$clk_div" == "" ]; then
+opt_div=""
+echo "fpga-init: clk_div  = <default>"
+else
+opt_div="-d $clk_div"
+echo "fpga-init: clk_div  = $clk_div"
+fi
+
+#read optional ctrl_in
+ctrl_in=`awk -F'=' "\\$1==\"$str_ctrl_in\" {print \\$2}" $mnt$config`
+if [ "$ctrl_in" == "" ]; then
+opt_in=""
+echo "fpga-init: ctrl_in  = <default>"
+else
+opt_in="-i $ctrl_in"
+echo "fpga-init: ctrl_in  = $ctrl_in"
+fi
+
+#read optional ctrl_out
+ctrl_out=`awk -F'=' "\\$1==\"$str_ctrl_out\" {print \\$2}" $mnt$config`
+if [ "$ctrl_out" == "" ]; then
+opt_out=""
+echo "fpga-init: ctrl_out = <default>"
+else
+opt_out="-o $ctrl_out"
+echo "fpga-init: ctrl_out = $ctrl_out"
+fi
+
+#read optional strobe 0
+strb0=`awk -F'=' "\\$1==\"$str_strb0\" {print \\$2}" $mnt$config`
+if [ "$strb0" == "" ]; then
+opt_strb0=""
+echo "fpga-init: strobe 0 = <default>"
+else
+opt_strb0="-b $strb0"
+echo "fpga-init: strobe 0 = $strb0"
+fi
+
+#read optional strobe 1
+strb1=`awk -F'=' "\\$1==\"$str_strb1\" {print \\$2}" $mnt$config`
+if [ "$strb1" == "" ]; then
+opt_strb1=""
+echo "fpga-init: strobe 1 = <default>"
+else
+opt_strb1="-b $strb1"
+echo "fpga-init: strobe 1 = $strb1"
+fi
+
+#read optional primary settings
+prim=`awk -F'=' "\\$1==\"$str_prim\" {print \\$2}" $mnt$config`
+if [ "$prim" == "" ]; then
+opt_prim=""
+echo "fpga-init: primary  = <default>"
+else
+opt_prim="-p $prim"
+echo "fpga-init: primary  = $prim"
+fi
+
+#read optional number of CPUs
+cpus=`awk -F'=' "\\$1==\"$str_cpus\" {print \\$2}" $mnt$config`
+if [ "$cpus" == "" ]; then
+opt_cpus=""
+echo "fpga-init: CPUs     = <default>"
+else
+opt_cpus="-c $cpus"
+echo "fpga-init: CPUs     = $cpus"
+fi
+
+#read optional wait time
+wait=`awk -F'=' "\\$1==\"$str_wait\" {print \\$2}" $mnt$config`
+if [ "$wait" == "" ]; then
+opt_wait=""
+echo "fpga-init: wait     = <default>"
+else
+opt_wait="-w $wait"
+echo "fpga-init: wait     = $wait"
+fi
+
+#read optional sync phase
+phase=`awk -F'=' "\\$1==\"$str_phase\" {print \\$2}" $mnt$config`
+if [ "$phase" == "" ]; then
+opt_phase=""
+echo "fpga-init: phase    = <default>"
+else
+opt_phase="-f $phase"
+echo "fpga-init: phase    = $phase"
+fi
+
+else
+#config file not found
+opt_IP="-I $INET" # this configures static IP. set to "" if you need DHCP or use config file.
+opt_port=""
+opt_div=""
+opt_in=""
+opt_out=""
+opt_strb0=""
+opt_strb1=""
+opt_prim=""
+opt_cpus=""
+opt_wait=""
+opt_phase=""
+echo "fpga-init: '$config' not found (using defaults)."
+
+fi
+
+#remove Windows "System Volume Information" folder and content
+#otherwise new files might not be seen/deleted on Windows!
+if [ -d "$mnt$svi" ]; then
+echo "fpga-init: removing '$svi'"
+rm -r "$mnt$svi"
+fi
+
+#remove old result file
+if [ -f "$mnt$result" ]; then
+echo "fpga-init: removing '$result'"
+rm "$mnt$result"
+fi
+
+#remove old steps file
+if [ -f "$mnt$steps" ]; then
+echo "fpga-init: removing '$steps'"
+rm "$mnt$steps"
+fi
+
+#unmount SD card for save removal
+echo "fpga-init: unmounting SD card"
+umount $SD
+rmdir $mnt
+
+#echo "create device"
+##id
+#cd /lib/modules/4.9.0-xilinx-v2017.4/extra
+##ls
+#echo "modprobe dio-24.ko myint=123 mystr=test"
+#echo
+#modprobe dio24.ko myint=123 mystr="test"
+
+major=`awk "\\$2==\"$device0\" {print \\$1}" /proc/devices`
+echo "fpga-init: create "$device0" device node ("$major")"
+mknod /dev/${device0}0 c $major 0
+
+major=`awk "\\$2==\"$device1\" {print \\$1}" /proc/devices`
+echo "fpga-init: create "$device1" device node ("$major")"
+mknod /dev/${device1}0 c $major 0
+#cd
+
+# start fpga-server in separate thread
+echo "fpga-init: starting fpga-server ..."
+/usr/bin/fpga-server -s $opt_IP $opt_port $opt_div $opt_in $opt_out $opt_strb0 $opt_strb1 $opt_prim $opt_cpus $opt_wait $opt_phase &
+
+echo "fpga-init: done"
+
+

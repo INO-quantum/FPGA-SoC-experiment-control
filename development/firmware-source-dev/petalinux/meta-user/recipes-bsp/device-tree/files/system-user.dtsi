@@ -1,0 +1,154 @@
+/* 
+20230905 adapted by Andi from 2017.4 Cora-Z7 bsp file.
+add new entries within /{ };
+modify existing entries below with &entry {};
+to compile only device tree: petalinux-build -c device tree [-x cleansstate]
+changes do not appear in pl.dtsi but you can decompile /images/linux/system.dtb:
+dtc -I dtb -O dts system.dtb -o system.dts
+*/
+
+/include/ "system-conf.dtsi"
+#include <dt-bindings/gpio/gpio.h>
+/ {
+    model = "Zynq Cora Z7 Development Board";
+    compatible = "digilent,zynq-coraz7", "xlnx,zynq-7000";
+
+    chosen {
+        bootargs = "console=ttyPS0,115200 earlyprintk uio_pdrv_genirq.of_id=generic-uio";
+    };
+
+    usb_phy0: phy0@e0002000 {
+        compatible = "ulpi-phy";
+        #phy-cells = <0>;
+        reg = <0xe0002000 0x1000>;
+        view-port = <0x0170>;
+        drv-vbus;
+    };
+
+    /* 
+    added by Andi, 128MiB CMA shared memory = 16M samples with 8bytes/sample
+    0x08400000 reserves only 0x08000000
+    0x09000000 gives error with uboot loading kernel image
+    0x10000000 gives error out of memory
+    see https://xilinx-wiki.atlassian.net/wiki/spaces/A/pages/18841683/Linux+Reserved+Memory 
+    */
+    reserved-memory {
+        #address-cells = <1>;
+        #size-cells = <1>;
+        ranges;
+
+        reserved: buffer@0x8000000 {
+            compatible = "shared-dma-pool";
+            reusable;
+            reg = <0x8000000 0x8000000>;
+            linux,cma-default;
+        };
+    };
+
+};
+
+/* Andi: remove the 2nd cpu which is not there for -07S version. comment for -10 version */
+&amba {
+	ptm@f889d000 {
+		cpu = <&cpu0>;
+	};
+};
+
+/*Andi: manually add the irq_FPGA interrupt; alternatively try to name pin intr_FPGA*/
+&dio24_0 {
+    interrupt-parent = <&intc>;
+    interrupts = <0 31 4>;
+};
+
+/* 
+added properites for each clock wizards with AXI Lite interface, 30/8/2021, by Andi: 
+these properties will be added to device tree node in addition to auto-generated properties (see pl.dtsi);
+index = unique wizard index; 
+PLL_type: 0 = None, 1 = PLL, 2 = MMCM; 
+in_ps:    input clock period in ps;
+
+&clk_wiz_0 {
+    index = <0>;
+    PLL_type = <2>;
+    period_in_ps = <20000>;
+};
+
+&clk_wiz_2 {
+    index = <1>;
+    PLL_type = <1>;
+    period_in_ps = <10000>;
+};*/
+
+&gem0 {
+    phy-handle = <&ethernet_phy>;
+/*    phy-reset-gpio = <&gpio0 GPIO_ACTIVE_LOW>;
+    phy-reset-active-low;    
+    phy-reset-duration = <10>;  */
+    ethernet_phy: ethernet-phy@1 { /* rtl8211e-vl */
+        reg = <1>;
+        device_type = "ethernet-phy";
+    };
+};
+&usb0 {    
+    dr_mode = "host";
+    usb-phy = <&usb_phy0>;
+};
+&sdhci0 {
+    u-boot,dm-pre-reloc;
+};
+&uart0 {
+    u-boot,dm-pre-reloc;
+};
+
+
+&xadc_wiz_0 {
+    clocks = <&clkc 15>;
+    xlnx,channels {
+        #address-cells = <1>;
+        #size-cells = <0>;
+        channelV@0 { /* V_P/V_N */
+            reg = <0>;
+        };
+        channelA8A9@1 { /* vaux0 */
+            reg = <1>;
+        };
+        channelA0@2 {
+            reg = <2>;
+        };
+        channelA4@6 {
+            reg = <6>;
+        };
+        channelA2@7 {
+            reg = <7>;
+        };
+        channelA10A11@9 {
+            reg = <9>;
+        };
+        channelA1@10 {
+            reg = <10>;
+        };
+        channelA6A7@13 {
+            reg = <13>;
+        };
+        channelA5@14 {
+            reg = <14>;
+        };
+        channelA3@16 {
+            reg = <16>;
+        };
+    };
+};
+
+/*
+&pwm_rgb {
+    compatible = "generic-uio";    
+};
+
+&axi_gpio_btn {
+    compatible = "generic-uio";
+};
+&axi_gpio_shield {
+    compatible = "generic-uio";
+};*/
+
+

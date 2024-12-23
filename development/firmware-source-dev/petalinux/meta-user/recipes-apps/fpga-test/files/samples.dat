@@ -1,0 +1,26 @@
+// definition of sample data
+// give list of decimal or hex (with '0x') 32bit integers separated with comma or new line
+// first integer = time in units of 1/bus output rate
+// second integer = 16bit data + 7 or 8 bits of address and optional STRB, STOP, NOP bits
+// comments can be inserted with "//" at beginning of line or after data but not within data
+// new lines can be inserted instead of comma. empty lines are ok.
+	      0, 0x0001ffff
+	      1, 0x00810000
+	      3, 0x0001ffff
+	      4, 0x00810000
+	      7, 0x0001ffff
+	      8, 0x00810000
+	 600000, 0x00010020
+	 700000, 0x00810040
+	 800000, 0x00010080
+	 900000, 0x00810100
+	1000000, 0x00010200
+	1100000, 0x00810400
+	1200000, 0x00010800
+	1300000, 0x00811000
+	1400000, 0x00012000
+	1500000, 0x00814000
+	1600000, 0x00018000
+	1700000, 0x0081ffff
+	1800000, 0x00010000
+
