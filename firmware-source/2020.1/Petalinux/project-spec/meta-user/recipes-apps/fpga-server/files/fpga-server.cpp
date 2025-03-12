@@ -269,14 +269,16 @@ int set_IP(char *interface, char *ip_address, char *ip_mask) {
                 // interface is ready
             
                 // get actual IP address
+                // update 2025/03/11: this fails when DHCP is enabled
                 state = ioctl(sock, SIOCGIFADDR, &ifr);
                 if ( state < 0 ) {
-                    printf("get IP (1) failed. Errno = %d\n", errno);
+                    printf("get IP (1) failed. Errno = %d (ignored - dhcp might be enabled)\n", errno);
                 }
                 else {
                     inet_ntop(AF_INET, &addr->sin_addr, old_ip, INET_ADDRSTRLEN);
                     printf("actual flags 0x%x (ok), IP '%s'\n", flags, old_ip); 
-
+                } // update 2025/03/11
+                if (true) { // update 2025/03/11
                     // set IP address
                     inet_pton(AF_INET, ip_address, &addr->sin_addr);
                     ifr.ifr_addr.sa_family = AF_INET;
