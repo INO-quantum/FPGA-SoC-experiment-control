@@ -93,13 +93,13 @@ Below you find how to create and compile the Petalinux project and generate the 
 
 ### Generate the Petalinux Project
 
-1. From the [Petalinux directiory](/firmware-source/2020.1/Petalinux) copy the file ExpCtrl-Cora-Z7-yy-v1.4_zzzz.bsp for your board (yy="10" or "07S" and zzzz=release date), open a console and `cd` to a folder where you want the project to be located and create the project:
+1. From the [Petalinux directory](/firmware-source/2020.1/Petalinux) copy the file ExpCtrl-Cora-Z7-yy-v1.4_zzzz.bsp for your board (yy="10" or "07S" and zzzz=release date), open a console and `cd` to a folder where you want the project to be located and create the project:
 
         cd <path-to-folder-where-new-project-should-be-created>
         source <path-to-petalinux-installation-folder>/settings.sh
         petalinux-create -t project -s <path to bsp file>/ExpCtrl-Cora-Z7-yy-v1.4_zzzz.bsp
 
-This creates the project folder ExpCtrl-Cora-Z7-yy-v1.4_zzzz in the current directy. When this does not give an error, `cd` into the new project folder and start configuring and compiling (see [next section](/firmware-source#Compiling-the-Petalinux-project)).
+This creates the project folder ExpCtrl-Cora-Z7-yy-v1.4_zzzz in the current directy. When this does not give an error you can skip steps 2-4, and `cd` into the new project folder, and proceed to [Compiling the Petalinux project](/firmware-source#Compiling-the-Petalinux-project).
 
 > [!NOTE]
 > After the project is created you cannot move or rename the project folder! Any attempt of compilation will break the project in a non-revertible way.
@@ -116,20 +116,19 @@ The first `petalinux-config` is to select the .xsa file (see [next section 4](/f
 
 In the kernel configuration one has to disable the Xilinx DMA driver: Navigate to `Device Drivers` and disable `Multimedia support` by pressing the space key (this disables `Xilinx Video IP`) and go inside `Graphics support` and disable `Xilinx DRM KMS Driver`. Finally, disable the entire `DMA Engine support` (disables `DMA API driver Driver for PL330`, `Xilinx AXI DMAS engine`, `Xilinx DMA engines`, `Xilinx Framebuffer`). Optionally, you can also disable: `PCI support`, `Sound card support`, `Real Time clock`, and `Xilinx AXI Performance Monitor driver` within `Userspace I/O driver`.
 
-The rootfs (root file system) configuration allows to remove further unneccessary components from the image file: In `Filesystem Packages` one can disable everything not needed and in `Petalinux Package Groups` and `Image Features` and `user packages` nothing should be selected. In `apps` only `fpga-init`, `fpga-server` and `fpga-test`, and in `modules` only `dio24` should be selected (they will appear here only after they have been created; see below) and disable eventual selected default applications (`gpio-demo` and `peekpoke`).
+The rootfs (root file system) configuration allows to remove further unneccessary components from the image file: In `Filesystem Packages` one can disable everything not needed and in `Petalinux Package Groups` and `Image Features` and `user packages` nothing should be selected. In `apps` only `fpga-init`, `fpga-server` and `fpga-test`, and in `modules` only `dio24` should be selected (they will appear here only after they have been created; see [4. Create device driver and applications](/firmware-source#Generate-the-Petalinux-Project)) and disable eventual selected default applications (`gpio-demo` and `peekpoke`).
 
-The configuration of u-boot is optional. I do not change anything there, but it fails when the next step ([Update the device tree](/firmware-source#Generate-the-Petalinux-Project)) is not done.
+The configuration of u-boot is optional. I do not change anything there, but it fails when the next step ([3. Update the device tree](/firmware-source#Generate-the-Petalinux-Project)) is not done.
 
 3. Update the device-tree:
 
-        replace the file <project folder>/project-spec/meta-user/recipes-bsp/device-tree/files/system-user.dtsi
-        with the one [provided here](/firmware-source/2020.1/Petalinux/project-spec/meta-user/recipes-bsp/device-tree/files/system-user.dtsi).
+Replace the file `<project folder>/project-spec/meta-user/recipes-bsp/device-tree/files/system-user.dtsi` with the one [provided here](/firmware-source/2020.1/Petalinux/project-spec/meta-user/recipes-bsp/device-tree/files/system-user.dtsi). Ensure that for the Cora-Z7-07S board in the replaced file the second CPU is removed and for the Cora-Z7-10 board the CPU is present (see comments in file and [Change FPGA board version below](/firmware-source#Change-FPGA-board-version)). After this step `petalinux-config -c u-boot` should execute without error.
 
-Ensure that in the replaced file the second CPU is removed for the Cora-Z7-07S board. After this step `petalinux-config -c u-boot` should execute without error.
+4. Create device driver and applications:
 
-4. Now you can proceed to create the device driver and the three applications - see [sections 1-3. in Modifying the project](/firmware-source#Modifying-the-project) below. Check that with `petalinux-config -c rootfs` the applications are enabled.
+Now you can proceed to create the device driver and the three applications - see [sections 1-3. in Modifying the project](/firmware-source#Modifying-the-project) below. Check that with `petalinux-config -c rootfs` the applications are enabled.
 
-Now you have the new project ready for the first compilation ([Compiling the Petalinux project](/firmware-source#Compiling-the-Petalinux-project)).
+Now you have the new project ready for [Compiling the Petalinux project](/firmware-source#Compiling-the-Petalinux-project).
 
 ### Compiling the Petalinux project
 
