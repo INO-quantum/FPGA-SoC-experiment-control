@@ -1320,6 +1320,7 @@ int stop_RX(bool reset_on_error) {
 
 	if((status.ctrl_DMA & DMA_CTRL_ENABLE_RX) == 0) err = WARN_ALREADY_DONE;
 	else {
+        /* update 2025/03/11: RX channel is never idle, so we reset it immediately, otherwise stop time is very long.
 		if ((READ_DMA_REGISTER(DMA_REG_S2MM_STATUS) & S2MM_STATUS_IDLE) == 0) {
 			//pr_err(NAME "stop_RX not idle ...\n");
 			if(reset_on_error) {
@@ -1337,7 +1338,16 @@ int stop_RX(bool reset_on_error) {
 				pr_err(NAME "stop_RX not idle (might fail)\n");
 				err = WARN_NOT_IDLE;
 			}
+		}*/
+		
+		if ((READ_DMA_REGISTER(DMA_REG_S2MM_STATUS) & S2MM_STATUS_IDLE) == 0) {
+		    pr_err(NAME "stop_RX not idle: reset RX (and TX)!\n");
+		    err = reset_RX();
+		    if(!err) err = WARN_TIMEOUT;
+		    status.ctrl_DMA |= DMA_CTRL_ENABLE_RX; // otherwise verify_RX error when finds completed dscs
 		}
+		// update 2025/03/11: end
+
 
 		// reset run bit and wait for the halted bit to go high
 		RESET_REGISTER_BIT(DMA_REG_S2MM_CTRL, S2MM_CTRL_RUN);
