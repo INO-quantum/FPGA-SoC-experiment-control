@@ -252,8 +252,8 @@ Each of these commands opens a configuration menu where you can change the setti
 
 5. Package a project as bsp:
 
-        petalinux-build -c distclean        // clean project
-        peatlinux-build -c mrproper         // optional delete workspace and temporary files and folders
+        petalinux-build -x distclean        // clean project
+        peatlinux-build -x mrproper         // optional: delete entire workspace. attention: you have to recompile everything! 
         cd <location where bsp should be generated>
         petalinux-package --bsp -p <project folder> --hwsource <path to and name of xsa> --exclude-workspace --output <file name of .bsp>
         
