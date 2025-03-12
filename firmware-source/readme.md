@@ -201,7 +201,7 @@ The same steps are needed after creating a new .xsa file with Vivado.
 
 ### Change FPGA board version
 
-In the [Petalinux folder](/firmware-source/2020.1/Petalinux) I provide already the `bsp` to create the project for the different FPGA boards. It is however easy to switch between the board also in the project. First you have to edit the `system-user.dtsi` file in the folder `<project folder>/projet-spec/meta-user/recipes-bsp/device-tree/files` in order to tell Petalinux if the second CPU core is present or not. For the `Cora-Z7-10` comment the following entry which is needed for the `Cora-Z7-07S` board:
+In the [Petalinux folder](/firmware-source/2020.1/Petalinux) I provide already the `bsp` to create the project for the different FPGA boards. It is however easy to switch between the boards also in the project. First you have to edit the `system-user.dtsi` file in the folder `<project folder>/projet-spec/meta-user/recipes-bsp/device-tree/files` in order to tell Petalinux if the second CPU core is present or not. For the `Cora-Z7-10` comment (using `/**/` and not `//`) the following entry, or uncomment it for the `Cora-Z7-07S` board:
         
         &amba {
 	        ptm@f889d000 {
@@ -209,7 +209,7 @@ In the [Petalinux folder](/firmware-source/2020.1/Petalinux) I provide already t
 	        };
         };
 
-After this change, select the .xsa file for the proper board and recompile as described in the [previous section](/firmware-source#change-buffer-board-version).
+After this change, select the .xsa file for the proper board and recompile and package as described in [sections 4-6 in Compiling the Petalinux project](/firmware-source#Compiling-the-Petalinux-project).
 
 ### Modifying the project
 
@@ -231,7 +231,7 @@ The project uses the `dio24` kernel module driver which manages three devices in
  
 This will add a hello-world application in the folder /project-spec/meta-user/recipes-apps which you can modify. 
 
-The project uses two C++ applications: fpga-server which communicates via Etherent with the control computer and fpga-test which is used for testing (optional; requires console access, see [In case of problems](/firmware-source#In-case-of-problems)). To re-create the server replace the `fpga-server` folder with the [server source](firmware-source/2020.1/Petalinux/project-spec/meta-user/recipes-apps/fpga-server). The `fpga-test` folder can be found [here](firmware-source/2020.1/Petalinux/project-spec/meta-user/recipes-apps/fpga-test). 
+The project uses two C++ applications: fpga-server which communicates via Ethernet with the control computer and fpga-test which is used for testing (optional; requires console access, see [In case of problems](/firmware-source#In-case-of-problems)). To re-create the server replace the `fpga-server` folder with the [server source](/firmware-source/2020.1/Petalinux/project-spec/meta-user/recipes-apps/fpga-server). The `fpga-test` folder can be found [here](/firmware-source/2020.1/Petalinux/project-spec/meta-user/recipes-apps/fpga-test). 
        
 3. Add a startup script (here `fpga-init`):
         
@@ -240,7 +240,7 @@ The project uses two C++ applications: fpga-server which communicates via Ethere
 
 This will add a demo startup script in the folder /project-spec/meta-user/recipes-apps which you can modify.
 
-The project uses the startup script `fpga-init` which reads the `server.config` file from the SD card and launches the `fpga-server` application giving it all configuration options. To re-create the startup script replace the `fpga-init` folder with the [startup script source](firmware-source/2020.1/Petalinux/project-spec/meta-user/recipes-apps/fpga-init).
+The project uses the startup script `fpga-init` which reads the `server.config` file from the SD card and launches the `fpga-server` application giving it all configuration options. To re-create the startup script replace the `fpga-init` folder with the [startup script source](/firmware-source/2020.1/Petalinux/project-spec/meta-user/recipes-apps/fpga-init).
 
 4. Configure kernel, root file system (rootfs) and boot loader (u-boot):
 
@@ -248,7 +248,7 @@ The project uses the startup script `fpga-init` which reads the `server.config` 
         petalinux-config -c rootfs
         petalinux-config -c u-boot
         
-Each of these commands opens a configuration menu where you can change the settings of each of the components. See also notes in section `Generate the Petalinux Project`. 
+Each of these commands opens a configuration menu where you can change the settings of each of the components. See also notes in section [Generate the Petalinux Project](/firmware-source#Generate-the-Petalinux-Project). 
 
 5. Package a project as bsp:
 
@@ -259,7 +259,7 @@ Each of these commands opens a configuration menu where you can change the setti
         
 ### In case of problems
 
-- Don't panic! This is normal for such an involved project which depends on many components. You will for sure encounter problems when you try to use different versions of Vivado/Petalinux or when you try on a different operation system - especially on a not recommonded one for these tools. Vivado and Petalinux in general must have the same version. At present I use Vivado/Petalinux 2020.1, the original project was with 2017.4. Newer versions would be preferred but fixing all the problems after migrating to newer versions takes some time. Additionally, I have a project on the RedPitaya board which requires 2020.1.
+- Don't panic! This is normal for such an involved project which depends on many components. You will for sure encounter problems when you try to use different versions of Vivado/Petalinux or when you try on a different operation system - especially on a not recommonded one. Vivado and Petalinux in general must have the same version. At present I use Vivado/Petalinux 2020.1, the original project was with 2017.4. Newer versions would be preferred but fixing all the problems after migrating to newer versions takes some time. Additionally, I have serveral projects using the RedPitaya board which requires Vivado 2020.1.
 - Check the board is powered (red LED is on) and power is stable - especially during booting. If using a wall-plug be absolutely sure it gives 5V DC. Steady-state current is 0.3A but during booting it might be higher. A supply with 1A is recommended.
 - There are two jumpers on the board, one for the power supply (near the jack) needs to be set to EXT or USB depending if you power from the jack (2.1-2.5mm center-positive) or via the USB plug. The second jumper should be shortened in order to boot from SD card.
 - About 1s after switching on the power a yellow or green LED should switch on in addtion to the red power LED. This indicates the bitstream was written to the FPGA part. If this is not the case then either the SD card is not properly inserted or corrupt, or the bitstream is for a different board. Check that the sticker on the FPGA-SoC chip reads "10" for the Cora-Z7-10 board or "7S" for the Cora-Z7-07S board and choose the proper firmware for the board. I had problems with low-quality SD cards which broke after only one month of usage although the board only reads the SD card and does not write (user software can also write to it when needed).
