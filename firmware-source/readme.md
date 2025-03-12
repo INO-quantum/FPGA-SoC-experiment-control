@@ -85,7 +85,7 @@ If you want to generate the firmware for another buffer board, you have to enabl
 
 ## Software implementation
 
-Petalinux is a simple Linux distribution which allows to run an embedded Linux operating system on the CPU part of the FPGA-SoC chip. The original board support package (.bsp) and demos are from [Digilent](https://reference.digilentinc.com/reference/software/petalinux/start) and require Petalinux 2017.4 installed on a Linux operating system. The present project works with Vivado and Petalinux 2020.1 on Ubuntu 20.04 LTS[^1]. For the installation of Petalinux 2020.1 please consult the [Petalinux Tools guide from Xilinx](https://docs.xilinx.com/v/u/2020.1-English/ug1144-petalinux-tools-reference-guide). More condensed information (maybe not fully up-to-date) can be obtained from [Cora-Z7-07S Petalinux BSP Project from Digilent](https://github.com/Digilent/Petalinux-Cora-Z7-07S/blob/master/README.md). The guides use the recommended installation folder /opt/pkg/petalinux[^2].
+Petalinux is a simple Linux distribution which allows to run an embedded Linux operating system on the CPU part of the FPGA-SoC chip. The original board support package (.bsp) and demos are from [Digilent](https://reference.digilentinc.com/reference/software/petalinux/start) and require Petalinux 2017.4 installed on a Linux operating system (can be a virtual environment). The present project works with Vivado and Petalinux 2020.1 on Ubuntu 20.04 LTS[^1]. For the installation of Petalinux 2020.1 please consult the [Petalinux Tools guide from Xilinx](https://docs.xilinx.com/v/u/2020.1-English/ug1144-petalinux-tools-reference-guide). More condensed information (maybe not fully up-to-date) can be obtained from [Cora-Z7-07S Petalinux BSP Project from Digilent](https://github.com/Digilent/Petalinux-Cora-Z7-07S/blob/master/README.md). The guides use the recommended installation folder /opt/pkg/petalinux[^2].
 
 The generated [.xsa files from Vivado](/firmware-source/2020.1/Vivado/xsa/) contain the bitstream (.bit) which the bootloader is uploading on the FPGA part and the device tree used by Petalinux to define external devices which can then be accessed by user-defined application software. 
 
@@ -99,7 +99,7 @@ Below you find how to create and compile the Petalinux project and generate the 
         source <path-to-petalinux-installation-folder>/settings.sh
         petalinux-create -t project -s <path to bsp file>/ExpCtrl-Cora-Z7-yy-v1.4_zzzz.bsp
 
-This creates the project folder ExpCtrl-Cora-Z7-yy-v1.4_zzzz in the current directy. When this does not give an error you can skip steps 2-4, and `cd` into the new project folder, and proceed to [Compiling the Petalinux project](/firmware-source#Compiling-the-Petalinux-project).
+This creates the project folder ExpCtrl-Cora-Z7-yy-v1.4_zzzz in the current directy. When this does not give an error, you can skip steps 2-4, and proceed directly to [Compiling the Petalinux project](/firmware-source#Compiling-the-Petalinux-project).
 
 > [!NOTE]
 > After the project is created you cannot move or rename the project folder! Any attempt of compilation will break the project in a non-revertible way.
@@ -122,11 +122,11 @@ The configuration of u-boot is optional. I do not change anything there, but it 
 
 3. Update the device-tree:
 
-Replace the file `<project folder>/project-spec/meta-user/recipes-bsp/device-tree/files/system-user.dtsi` with the one [provided here](/firmware-source/2020.1/Petalinux/project-spec/meta-user/recipes-bsp/device-tree/files/system-user.dtsi). Ensure that for the Cora-Z7-07S board in the replaced file the second CPU is removed and for the Cora-Z7-10 board the CPU is present (see comments in file and [Change FPGA board version below](/firmware-source#Change-FPGA-board-version)). After this step `petalinux-config -c u-boot` should execute without error.
+Replace the file `<project folder>/project-spec/meta-user/recipes-bsp/device-tree/files/system-user.dtsi` with the one [provided here](/firmware-source/2020.1/Petalinux/project-spec/meta-user/recipes-bsp/device-tree/files/system-user.dtsi). Ensure that in the replaced file the second CPU is removed (present) for the Cora-Z7-07S (Cora-Z7-10) board (see comments in system-user.dtsi and [Change FPGA board version below](/firmware-source#Change-FPGA-board-version)). After this step `petalinux-config -c u-boot` should execute without error.
 
 4. Create device driver and applications:
 
-Now you can proceed to create the device driver and the three applications - see [sections 1-3. in Modifying the project](/firmware-source#Modifying-the-project) below. Check that with `petalinux-config -c rootfs` the applications are enabled.
+Now you can proceed to create the device driver (`dio24`) and the three applications (`fpga-server`, `fpga-test` and `fpga-init`) - see [sections 1-3. in Modifying the project](/firmware-source#Modifying-the-project) below. After this, check that with `petalinux-config -c rootfs` the applications are enabled.
 
 Now you have the new project ready for [Compiling the Petalinux project](/firmware-source#Compiling-the-Petalinux-project).
 
@@ -175,11 +175,13 @@ Copy the .xsa file generated by Vivado [see above](/firmware-source#generate-the
 
 This assumes that only one .xsa file is in the project folder. Alternatively, you can also give the file name and path after the '='.
 
-5. Compile project:
+5. Compile the project:
 
         petalinux-build
     
-For the first time this will download the linux kernel (if not selected from local folder) and FSBL (first-stage bootloader) source and u-boot (second stage bootloader source) and compilation will need some time (9 minutes on my laptop). The warnings related to the non-official Ubuntu version can be ignored. In the "Tasks Summary" output it should say "all succeeded" and no red messages should appear. Sometimes compilation fails, which is either a timeout (first-stage booloader config after 3 minutes waiting for other tasks to finish) or low memory (less likely) when many tasks run in parallel. Just compile again and it should work.
+For the first time this will download the linux kernel (if not selected from local folder) and FSBL (first-stage bootloader) source and u-boot (linux bootloader source) and compilation will need some time (9 minutes on my laptop[^3]). The warnings related to the non-official Ubuntu version can be ignored. In the "Tasks Summary" output it should say "all succeeded" and no red messages should appear. Sometimes compilation fails, which is either a timeout (first-stage booloader config after 3 minutes waiting for other tasks to finish) or low memory (are you running in a virual environment?) when many tasks run in parallel. Just compile again and it should work.
+
+[^3]: Recently, downloading of `qemu-xilinx-native` is extremely slow and can prolong the first compile time significantly (40 minutes!). This might even fail and one has to retry compilation, maybe at a later time, since disabling `qemu-xilinx-native` is not working according to online resources (I have not tried).
 
 6. Package files for booting from SD card:
 
@@ -211,28 +213,34 @@ After this change, select the .xsa file for the proper board and recompile as de
 
 ### Modifying the project
 
-These are the steps if you want to add new functionality or when you have to create a new project from scratch. Execute these commands inside the project folder (except of packaging) and after sourcing petalinux.
+These are the steps if you want to add new functionality or when you have to [create the device driver and applications without bsp file](/firmware-source#Generate-the-Petalinux-Project). Execute these commands inside the project folder (except of packaging) and after sourcing petalinux. To re-create the device driver and applications from the project without bsp file, just replace the folders generated here with the ones provided in the [firmware source](/firmware-source/2020.1/Petalinux/project-spec/meta-user). The exact location is indicated below.
 
 1. Add a new driver module (we use `dio24`):
 
         petalinux-create -t modules -n dio24 --enable    // use lowercase letters and do not use '_'
         petalinux-config -c rootfs                       // check if module is in list and enable module if not --enable
 
-This will add a driver template module to the project in the folder `/project-spec/meta-user/recipes-modules` which you can edit or copy from the [firmware souce](firmware-source/2020.1/Petalinux/project-spec/meta-user/recipes-modules/dio24).
+This will add a driver template module to the project in the folder `/project-spec/meta-user/recipes-modules` which you can modify. 
+
+The project uses the `dio24` kernel module driver which manages three devices in the FPGA part: the experiment control logic, the DMA module (direct-memory-access which transmits data from and to external memory) and the analog-to-digital conversion used to read the temperature of the FPGA-SoC. To re-create the driver replace the `dio24` folder with the [dio24 source](/firmware-source/2020.1/Petalinux/project-spec/meta-user/recipes-modules/dio24). 
 
 2. Add a new C++ application (we use `fpga-server` and the same for `fpga-test`):
 
         petalinux-create -t apps --template c++ -n fpga-server --enable  // use lowercase letters and do not use '_'
         petalinux-config -c rootfs                       // check if app is in list and enable if not --enable
  
-This will add a hello-world application in the folder /project-spec/meta-user/recipes-apps which you can edit or copy from the [firmware souce](firmware-source/2020.1/Petalinux/project-spec/meta-user/recipes-apps/fpga-server) and optionally [for fpga-test](firmware-source/2020.1/Petalinux/project-spec/meta-user/recipes-apps/fpga-test). 
+This will add a hello-world application in the folder /project-spec/meta-user/recipes-apps which you can modify. 
+
+The project uses two C++ applications: fpga-server which communicates via Etherent with the control computer and fpga-test which is used for testing (optional; requires console access, see [In case of problems](/firmware-source#In-case-of-problems)). To re-create the server replace the `fpga-server` folder with the [server source](firmware-source/2020.1/Petalinux/project-spec/meta-user/recipes-apps/fpga-server). The `fpga-test` folder can be found [here](firmware-source/2020.1/Petalinux/project-spec/meta-user/recipes-apps/fpga-test). 
        
 3. Add a startup script (here `fpga-init`):
         
         petalinux-create -t apps --template install -n fpga-init --enable   // use lowercase letters and do not use '_'
         petalinux-config -c rootfs                      // check if is in list of apps and enable if not --enable
 
-This will add a demo installation script in the folder /project-spec/meta-user/recipes-apps which you can edit or copy from the [firmware souce](firmware-source/2020.1/Petalinux/project-spec/meta-user/recipes-apps/fpga-init).
+This will add a demo startup script in the folder /project-spec/meta-user/recipes-apps which you can modify.
+
+The project uses the startup script `fpga-init` which reads the `server.config` file from the SD card and launches the `fpga-server` application giving it all configuration options. To re-create the startup script replace the `fpga-init` folder with the [startup script source](firmware-source/2020.1/Petalinux/project-spec/meta-user/recipes-apps/fpga-init).
 
 4. Configure kernel, root file system (rootfs) and boot loader (u-boot):
 
