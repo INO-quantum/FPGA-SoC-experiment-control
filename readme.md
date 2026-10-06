@@ -113,5 +113,7 @@ The FPGA-SoC replaces the DIO64 card but also improves the old system in several
 
 I am working on a new major update which is planned to be released beginning of 2025. All present features are maintained but it will feature (mainly internal) improvements with respect to the present one which will reduce resource usage and improve timing constraints. This is needed for future updates. It will add new features as the contiguous strobe requested by users. It will again support 20MHz output bus rate, which was broken with some update in the past. The "cycling mode" will be finally fully supported (at least thats planned) and a wide choice of programmable I/O signals are already implemneted with a (simple) conditional logic triggering system. The old auto-sync will be retired and is replaced with a simpler synchronization scheme - these changes are transparent to the user such that the old functionality is maintained. A development version is available in the folder [development version](https://github.com/INO-quantum/FPGA-SoC-experiment-control/tree/main/development) but use it only after checking back with me.
 
+>[!NOTE]
+> I was assigned a to a new project and it was impossible to work on this planned update. Since this project is now finished (2026) I might have the time to work on the update again, but I cannot promise. Ask me personally about the status. Small updates, like the `data start trigger`, which do not need too much time are more easy.
 
 

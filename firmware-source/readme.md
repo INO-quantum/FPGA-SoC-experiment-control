@@ -13,6 +13,8 @@ Ready-to-use firmware files can be found in the [firmware-release folder](/firmw
 
 The Hardware logic is generated with Vivado 2020.1 from Xilinx running on Windows or Ubuntu[^1]. Vivado WebPACK can be downloaded free of charge (after registering) and supports the Zynq-7000 series SoC devices from Xilinx which are used in this project. For instructions on how to install Vivado 2020.1 [see UG973 from Xilinx](https://docs.xilinx.com/v/u/2020.1-English/ug973-vivado-release-notes-install-license). See also the very good [tutorial from Digilent](https://digilent.com/reference/programmable-logic/guides/installing-vivado-and-vitis). The installation file size is huge which is a problem when you need to install several versions of Vivado or running Linux in a virtual environment. For this project `Vitis` is not needed but for debugging it can be useful. During the installation ensure that support for the Zynq-7000 series devices is enabled. I have tested Vivado on Windows and Linux and have not seen a big difference.
 
+I am in the process to update the firmware and to migrate to Vivado and Petalinux 2022.2 on Ubuntu 2020.04 LTS. The updated firmware is placed in the 2022.2 folder. This contains at the moment only the update for the `data stop trigger` option.
+
 [^1]: Vivado and Petalinux 2020.1 officially support Ubuntu 18.04 LTS but I use Ubuntu 20.04 LTS without big problems.
 
 > [!NOTE]
@@ -86,8 +88,6 @@ If you want to generate the firmware for another buffer board, you have to enabl
 ## Software implementation
 
 Petalinux is a simple Linux distribution which allows to run an embedded Linux operating system on the CPU part of the FPGA-SoC chip. The original board support package (.bsp) and demos are from [Digilent](https://reference.digilentinc.com/reference/software/petalinux/start) and require Petalinux 2017.4 installed on a Linux operating system (can be a virtual environment). The present project works with Vivado and Petalinux 2020.1 on Ubuntu 20.04 LTS[^1]. For the installation of Petalinux 2020.1 please consult the [Petalinux Tools guide from Xilinx](https://docs.xilinx.com/v/u/2020.1-English/ug1144-petalinux-tools-reference-guide). More condensed information (maybe not fully up-to-date) can be obtained from [Cora-Z7-07S Petalinux BSP Project from Digilent](https://github.com/Digilent/Petalinux-Cora-Z7-07S/blob/master/README.md). The guides use the recommended installation folder /opt/pkg/petalinux[^2].
-
-I am in the process to update the firmware and to migrate to Vivado and Petalinux 2022.2 on Ubuntu 2020.04 LTS. The updated firmware is placed in the 2022.2 folder. This contains at the moment only the update for the `data stop trigger` option.
 
 The generated [.xsa files from Vivado](/firmware-source/2020.1/Vivado/xsa/) contain the bitstream (.bit) which the bootloader is uploading on the FPGA part and the device tree used by Petalinux to define external devices which can then be accessed by user-defined application software. 
 
