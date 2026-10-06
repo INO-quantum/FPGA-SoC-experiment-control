@@ -18,8 +18,13 @@ Each folder contains 4 files: BOOT.BIN is the bootloader and includes the logic 
 
 This folder contains the releases for the Florence and Trieste designs.
 
+The `_patch` version includes a bug fix for shorter times between experimental cycles (debugging `sleep_ms` statements were removed from `fpga-server`).
+
+The 2026 Florence version adds the `data stop trigger` at a programmable bit 28-31 (default 28) in the data. When this bit is set (function `set_ctrl_in`) and data stop is enabled, the board outputs the low 16bit data on the bus at the specified time and goes into the `wait` state. When the NOP bit is set in addition to the stop bit, no data is output, but the wait time is still executed. A restart trigger needs to be programmed in order to resume operation with the specificied digital external input signal. The wait state can be monitored by programming with `set_ctrl_out` a digital output with the source `wait`.
+
 ## Innsbruck
 
 This folder contains the releases for the Innsbruck design which is similar but not identical to the Florence design. The [development folder](https://github.com/INO-quantum/FPGA-SoC-experiment-control/tree/main/development) contains the newer version but which is still not completely tested and has some issues with synchronization of several boards.
 
+I did not had the time to continue debugging this version.
 
