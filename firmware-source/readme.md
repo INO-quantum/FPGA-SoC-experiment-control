@@ -9,11 +9,11 @@ The used software tools are heavy, not user-friendly and buggy. First time compi
 
 Ready-to-use firmware files can be found in the [firmware-release folder](/firmware-release): select the folder corresponding to your FPGA-SoC board and the version of your buffer card and choose primary or secondary board.
 
+I am in the process to update the firmware and to migrate to Vivado and Petalinux 2022.2 on Ubuntu 2020.04 LTS. The updated firmware is placed in the 2022.2 folder. This contains at the moment only the update for the `data stop trigger` option.
+
 ## Hardware implementation
 
 The Hardware logic is generated with Vivado 2020.1 from Xilinx running on Windows or Ubuntu[^1]. Vivado WebPACK can be downloaded free of charge (after registering) and supports the Zynq-7000 series SoC devices from Xilinx which are used in this project. For instructions on how to install Vivado 2020.1 [see UG973 from Xilinx](https://docs.xilinx.com/v/u/2020.1-English/ug973-vivado-release-notes-install-license). See also the very good [tutorial from Digilent](https://digilent.com/reference/programmable-logic/guides/installing-vivado-and-vitis). The installation file size is huge which is a problem when you need to install several versions of Vivado or running Linux in a virtual environment. For this project `Vitis` is not needed but for debugging it can be useful. During the installation ensure that support for the Zynq-7000 series devices is enabled. I have tested Vivado on Windows and Linux and have not seen a big difference.
-
-I am in the process to update the firmware and to migrate to Vivado and Petalinux 2022.2 on Ubuntu 2020.04 LTS. The updated firmware is placed in the 2022.2 folder. This contains at the moment only the update for the `data stop trigger` option.
 
 [^1]: Vivado and Petalinux 2020.1 officially support Ubuntu 18.04 LTS but I use Ubuntu 20.04 LTS without big problems.
 
